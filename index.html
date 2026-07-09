@@ -1,0 +1,2968 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WinClone</title>
+<style>
+  :root{
+    --accent:#4cc2ff;
+    --accent-solid:#0067c0;
+    --tb-h:48px;
+    --glass:rgba(32,32,32,.72);
+    --glass-2:rgba(43,43,43,.86);
+    --text:#ffffff;
+    --text-dim:#c8c8c8;
+    --stroke:rgba(255,255,255,.09);
+    --win-bg:#202020;
+    --win-head:#2b2b2b;
+    --radius:9px;
+    font-family:"Segoe UI Variable","Segoe UI",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow:hidden;user-select:none;color:var(--text)}
+  body{background:#000}
+  button{font-family:inherit;color:inherit}
+
+  /* ---------- WALLPAPER / DESKTOP ---------- */
+  #desktop{position:fixed;inset:0;overflow:hidden;transition:background-color .4s}
+  #desktop.dark{
+    background-color:#06101f;
+    background-image:
+      radial-gradient(55% 48% at 51% 56%, rgba(58,120,220,.55), transparent 70%),
+      radial-gradient(42% 42% at 63% 41%, rgba(126,84,214,.42), transparent 70%),
+      radial-gradient(36% 46% at 39% 40%, rgba(40,182,230,.40), transparent 72%),
+      radial-gradient(30% 34% at 55% 66%, rgba(255,150,90,.18), transparent 70%),
+      radial-gradient(130% 120% at 50% 50%, #0a1c3a, #050b16 82%);
+  }
+  #desktop.light{
+    background-color:#1560c4;
+    background-image:
+      radial-gradient(55% 48% at 51% 56%, rgba(120,190,255,.75), transparent 70%),
+      radial-gradient(42% 42% at 63% 41%, rgba(180,150,255,.55), transparent 70%),
+      radial-gradient(36% 46% at 39% 40%, rgba(120,220,255,.60), transparent 72%),
+      radial-gradient(130% 120% at 50% 50%, #2a72d0, #0f4aa0 82%);
+  }
+  #desktop::after{content:"";position:absolute;inset:-10%;pointer-events:none;
+    background:radial-gradient(40% 30% at 50% 48%, rgba(255,255,255,.06), transparent 70%);
+    animation:drift 22s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translate(-2%, -1%) scale(1.02)}to{transform:translate(2%, 2%) scale(1.06)}}
+
+  /* ---------- DESKTOP ICONS ---------- */
+  #icons{position:absolute;top:14px;left:14px;display:flex;flex-direction:column;flex-wrap:wrap;
+    gap:2px;height:calc(100% - var(--tb-h) - 30px);align-content:flex-start}
+  .dicon{width:86px;height:88px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    gap:6px;padding:8px 4px;border-radius:6px;cursor:default;text-align:center}
+  .dicon:hover{background:rgba(255,255,255,.12);outline:1px solid rgba(255,255,255,.15)}
+  .dicon.sel{background:rgba(120,180,255,.28);outline:1px solid rgba(140,190,255,.5)}
+  .dicon .gl{font-size:36px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
+  .dicon .lbl{font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);word-break:break-word;line-height:1.15}
+
+  /* ---------- WINDOWS ---------- */
+  .window{position:absolute;min-width:280px;min-height:180px;background:var(--win-bg);
+    border-radius:var(--radius);box-shadow:0 24px 60px rgba(0,0,0,.55),0 0 0 1px var(--stroke);
+    display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:scale(.94);
+    transition:opacity .13s ease, transform .13s ease}
+  .window.show{opacity:1;transform:scale(1)}
+  .window.max{border-radius:0}
+  .window.min{opacity:0;transform:scale(.9) translateY(40px);pointer-events:none}
+  .titlebar{height:34px;background:var(--win-head);display:flex;align-items:center;
+    justify-content:space-between;flex:0 0 auto;-webkit-user-select:none}
+  .tb-title{display:flex;align-items:center;gap:9px;padding-left:13px;font-size:12.5px;color:#eaeaea;overflow:hidden}
+  .tb-title .ic{font-size:15px}
+  .tb-title .tt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tb-controls{display:flex;height:100%}
+  .tb-btn{width:46px;height:100%;border:0;background:transparent;color:#e6e6e6;font-size:12px;
+    display:grid;place-items:center;cursor:default;transition:background .12s}
+  .tb-btn:hover{background:rgba(255,255,255,.09)}
+  .tb-btn.close:hover{background:#c42b1c;color:#fff}
+  .tb-btn svg{width:11px;height:11px}
+  .window-body{flex:1 1 auto;overflow:auto;background:var(--win-bg);position:relative}
+
+  /* resize handles */
+  .rz{position:absolute;z-index:5}
+  .rz-n{top:-3px;left:8px;right:8px;height:7px;cursor:ns-resize}
+  .rz-s{bottom:-3px;left:8px;right:8px;height:7px;cursor:ns-resize}
+  .rz-e{right:-3px;top:8px;bottom:8px;width:7px;cursor:ew-resize}
+  .rz-w{left:-3px;top:8px;bottom:8px;width:7px;cursor:ew-resize}
+  .rz-ne{top:-3px;right:-3px;width:12px;height:12px;cursor:nesw-resize}
+  .rz-nw{top:-3px;left:-3px;width:12px;height:12px;cursor:nwse-resize}
+  .rz-se{bottom:-3px;right:-3px;width:12px;height:12px;cursor:nwse-resize}
+  .rz-sw{bottom:-3px;left:-3px;width:12px;height:12px;cursor:nesw-resize}
+
+  /* ---------- TASKBAR ---------- */
+  #taskbar{position:fixed;left:0;right:0;bottom:0;height:var(--tb-h);z-index:9000;
+    background:var(--glass);backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);
+    border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center}
+  #tb-left{position:absolute;left:12px;display:flex;align-items:center;gap:6px}
+  #tb-center{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px}
+  #tb-right{position:absolute;right:6px;display:flex;align-items:center;gap:2px}
+  .tbtn{height:40px;min-width:40px;padding:0 8px;border:0;background:transparent;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;gap:8px;cursor:default;position:relative;transition:background .12s}
+  .tbtn:hover{background:rgba(255,255,255,.09)}
+  .tbtn .gl{font-size:22px;line-height:1;pointer-events:none}
+  .tbtn.run::after{content:"";position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+    width:6px;height:3px;border-radius:3px;background:#9aa0a6;transition:all .15s}
+  .tbtn.active::after{width:16px;background:var(--accent)}
+  #startbtn .gl{font-size:23px}
+  .trayitem{height:40px;padding:0 9px;border:0;background:transparent;border-radius:6px;display:flex;
+    align-items:center;gap:8px;cursor:default;font-size:12px;color:#eee;transition:background .12s}
+  .trayitem:hover{background:rgba(255,255,255,.09)}
+  #tray-clock{flex-direction:column;line-height:1.3;text-align:right;gap:0;font-size:12px}
+  #tray-clock small{font-size:11px;color:var(--text-dim)}
+  .tray-ic{font-size:15px}
+
+  /* ---------- FLYOUTS (start / quick / cal) ---------- */
+  .flyout{position:fixed;z-index:9500;background:var(--glass-2);backdrop-filter:blur(40px) saturate(1.5);
+    -webkit-backdrop-filter:blur(40px) saturate(1.5);border:1px solid var(--stroke);border-radius:12px;
+    box-shadow:0 26px 70px rgba(0,0,0,.6);opacity:0;transform:translateY(14px) scale(.99);pointer-events:none;
+    transition:opacity .16s ease, transform .16s ease}
+  .flyout.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+
+  /* start menu */
+  #startmenu{width:600px;max-width:94vw;bottom:calc(var(--tb-h) + 10px);left:50%;transform-origin:bottom center;
+    margin-left:-300px;padding:28px 40px 16px}
+  #startmenu.open{transform:translateY(0) scale(1)}
+  #start-search{width:100%;height:36px;border-radius:18px;border:1px solid var(--stroke);background:rgba(255,255,255,.06);
+    color:#fff;padding:0 16px 0 40px;font-size:13px;outline:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23bbb' stroke-width='2'><circle cx='7' cy='7' r='5'/><path d='M11 11l4 4'/></svg>");
+    background-repeat:no-repeat;background-position:14px center}
+  .sm-head{display:flex;justify-content:space-between;align-items:center;margin:20px 2px 12px;font-size:13px;color:#eee}
+  .sm-head b{font-weight:600}
+  .sm-head .allbtn{font-size:12px;color:#ddd;background:rgba(255,255,255,.08);border:0;border-radius:5px;padding:5px 12px;cursor:default}
+  .sm-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+  .sm-app{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px;border-radius:8px;cursor:default}
+  .sm-app:hover{background:rgba(255,255,255,.09)}
+  .sm-app .gl{font-size:30px}
+  .sm-app .nm{font-size:11.5px;color:#eee;text-align:center}
+  #startfoot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding-top:14px;border-top:1px solid var(--stroke)}
+  .sm-user{display:flex;align-items:center;gap:10px;font-size:13px;padding:6px 10px;border-radius:6px;cursor:default}
+  .sm-user:hover{background:rgba(255,255,255,.09)}
+  .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#5a8fe0,#8a5ad2);display:grid;place-items:center;font-size:14px;font-weight:600}
+  #powerbtn{width:34px;height:34px;border-radius:6px;border:0;background:transparent;font-size:16px;cursor:default}
+  #powerbtn:hover{background:rgba(255,255,255,.09)}
+
+  /* quick settings */
+  #quick{width:340px;bottom:calc(var(--tb-h) + 10px);right:8px;padding:18px}
+  .qs-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .qs-tile{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid var(--stroke);
+    border-radius:8px;padding:11px 12px;font-size:12.5px;cursor:default}
+  .qs-tile.on{background:var(--accent-solid);border-color:transparent}
+  .qs-tile .gl{font-size:17px}
+  .qs-slider{margin-top:16px;display:flex;align-items:center;gap:10px;font-size:15px}
+  .qs-slider input{flex:1;accent-color:var(--accent)}
+
+  /* calendar */
+  #cal{width:320px;bottom:calc(var(--tb-h) + 10px);right:8px;padding:18px}
+  #cal .cbig{font-size:14px;margin-bottom:6px}
+  #cal .cdate{font-size:13px;color:var(--text-dim);margin-bottom:14px}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:12px}
+  .cal-grid .dow{color:var(--text-dim);font-size:11px;padding:4px 0}
+  .cal-grid .cd{padding:6px 0;border-radius:50%;cursor:default}
+  .cal-grid .cd:hover{background:rgba(255,255,255,.1)}
+  .cal-grid .cd.today{background:var(--accent-solid);color:#fff}
+
+  /* context menu */
+  #ctx{position:fixed;z-index:9800;min-width:220px;background:var(--glass-2);backdrop-filter:blur(40px);
+    -webkit-backdrop-filter:blur(40px);border:1px solid var(--stroke);border-radius:9px;padding:6px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55);display:none;font-size:13px}
+  .ctx-item{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:5px;cursor:default}
+  .ctx-item:hover{background:rgba(255,255,255,.09)}
+  .ctx-item .gl{font-size:15px;width:18px;text-align:center}
+  .ctx-item .arw{margin-left:auto;color:#999}
+  .ctx-sep{height:1px;background:var(--stroke);margin:5px 8px}
+
+  /* ---------- LOGIN / BOOT ---------- */
+  #login{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background-color:#0a1830;
+    background-image:radial-gradient(60% 55% at 50% 45%,rgba(70,130,220,.6),transparent 70%),radial-gradient(120% 120% at 50% 50%,#12233f,#060d1a);
+    transition:opacity .6s ease, visibility .6s}
+  #login.hide{opacity:0;visibility:hidden}
+  #login .clock-big{font-size:84px;font-weight:300;letter-spacing:1px;text-shadow:0 3px 20px rgba(0,0,0,.5)}
+  #login .date-big{font-size:22px;font-weight:300;margin-top:2px;opacity:.9}
+  #login .lg-user{margin-top:70px;display:flex;flex-direction:column;align-items:center;gap:16px}
+  #login .avatar-lg{width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,#5a8fe0,#8a5ad2);
+    display:grid;place-items:center;font-size:52px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+  #login .lg-name{font-size:26px;font-weight:400}
+  #login .lg-row{display:flex;gap:8px;align-items:center}
+  #login input{width:230px;height:38px;border-radius:19px;border:1px solid rgba(255,255,255,.4);
+    background:rgba(255,255,255,.14);color:#fff;padding:0 46px 0 16px;font-size:14px;outline:none;backdrop-filter:blur(8px)}
+  #login input::placeholder{color:rgba(255,255,255,.7)}
+  #login .go{position:relative;left:-42px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.4);
+    background:rgba(255,255,255,.14);color:#fff;cursor:pointer;font-size:15px}
+  #login .go:hover{background:rgba(255,255,255,.28)}
+  #login .hint{margin-top:8px;font-size:12px;opacity:.7}
+
+  /* shutdown */
+  #shutdown{position:fixed;inset:0;z-index:100000;background:#000;color:#eee;display:none;
+    flex-direction:column;align-items:center;justify-content:center;gap:26px;font-weight:300}
+  #shutdown .spin{width:44px;height:44px;border:4px solid #444;border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* ---------- APP-SPECIFIC ---------- */
+  .np-toolbar,.term-in-line{font-size:12px}
+  .np-menu{height:30px;background:#252525;display:flex;align-items:center;gap:2px;padding:0 6px;flex:0 0 auto;border-bottom:1px solid #000}
+  .np-menu span{padding:5px 10px;border-radius:4px;font-size:12.5px;cursor:default}
+  .np-menu span:hover{background:rgba(255,255,255,.08)}
+  .np-area{width:100%;height:100%;resize:none;border:0;outline:0;background:#1e1e1e;color:#eaeaea;
+    font-family:"Consolas",monospace;font-size:14px;padding:12px;line-height:1.5}
+
+  .calc{display:flex;flex-direction:column;height:100%;background:#202020}
+  .calc-disp{padding:18px 18px 10px;text-align:right}
+  .calc-disp .expr{font-size:13px;color:#9a9a9a;min-height:18px;overflow:hidden}
+  .calc-disp .val{font-size:42px;font-weight:600;overflow:hidden}
+  .calc-keys{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px}
+  .calc-keys button{border:0;border-radius:6px;background:#323232;color:#fff;font-size:18px;cursor:default;transition:background .1s}
+  .calc-keys button:hover{background:#3d3d3d}
+  .calc-keys button.op{background:#2b2b2b}
+  .calc-keys button.eq{background:var(--accent-solid)}
+  .calc-keys button.eq:hover{background:#0078d4}
+
+  .term{height:100%;background:#0c0c0c;color:#e0e0e0;font-family:"Cascadia Code","Consolas",monospace;
+    font-size:13.5px;padding:10px 12px;overflow:auto;line-height:1.45}
+  .term .green{color:#16c60c}
+  .term .cyan{color:#3a96dd}
+  .term-input{display:flex;gap:6px}
+  .term-input input{flex:1;background:transparent;border:0;outline:0;color:#e0e0e0;font-family:inherit;font-size:13.5px}
+
+  .fx{display:flex;height:100%;background:#202020}
+  .fx-side{width:200px;flex:0 0 auto;background:#252525;border-right:1px solid #000;padding:8px 6px;overflow:auto;font-size:13px}
+  .fx-side .grp{color:#9a9a9a;font-size:11px;padding:8px 8px 4px}
+  .fx-side .item{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:5px;cursor:default}
+  .fx-side .item:hover{background:rgba(255,255,255,.08)}
+  .fx-side .item.act{background:rgba(120,180,255,.2)}
+  .fx-main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .fx-bar{height:44px;flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #000;background:#232323}
+  .fx-crumb{font-size:13px;color:#ddd;background:rgba(255,255,255,.05);border-radius:5px;padding:6px 12px;flex:1}
+  .fx-grid{flex:1;overflow:auto;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,96px);gap:6px;align-content:flex-start}
+  .fx-tile{width:96px;height:92px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:6px;cursor:default;text-align:center}
+  .fx-tile:hover{background:rgba(255,255,255,.08)}
+  .fx-tile .gl{font-size:38px;line-height:1}
+  .fx-tile .nm{font-size:11.5px;color:#eee;word-break:break-word;line-height:1.15}
+
+  .settings{display:flex;height:100%;background:#202020;font-size:13px}
+  .st-side{width:230px;flex:0 0 auto;background:#252525;padding:14px 8px;overflow:auto}
+  .st-user{display:flex;align-items:center;gap:12px;padding:10px;margin-bottom:10px}
+  .st-nav{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:6px;cursor:default;color:#eaeaea}
+  .st-nav:hover{background:rgba(255,255,255,.07)}
+  .st-nav.act{background:rgba(120,180,255,.16)}
+  .st-nav.act::before{content:"";position:absolute;left:0;width:3px;height:16px;background:var(--accent);border-radius:2px;margin-left:-8px}
+  .st-nav .gl{font-size:16px}
+  .st-main{flex:1;overflow:auto;padding:26px 30px}
+  .st-main h2{margin:0 0 20px;font-size:22px;font-weight:600}
+  .st-card{background:#2b2b2b;border:1px solid var(--stroke);border-radius:8px;padding:14px 16px;margin-bottom:10px;
+    display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .st-card .l{display:flex;align-items:center;gap:14px}
+  .st-card .l .gl{font-size:20px}
+  .st-card .t b{display:block;font-size:13.5px}
+  .st-card .t small{color:#9a9a9a;font-size:12px}
+  .toggle{width:44px;height:24px;border-radius:12px;background:#5a5a5a;position:relative;cursor:default;flex:0 0 auto;transition:background .18s}
+  .toggle.on{background:var(--accent-solid)}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .18s}
+  .toggle.on::after{left:23px}
+  .swatches{display:flex;gap:8px}
+  .sw{width:26px;height:26px;border-radius:50%;cursor:default;border:2px solid transparent}
+  .sw.sel{border-color:#fff}
+
+  .edge{display:flex;flex-direction:column;height:100%;background:#f3f3f3}
+  .edge-bar{height:46px;flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 12px;background:#dfe3e8}
+  .edge-nav{width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:#333;font-size:15px;cursor:default}
+  .edge-nav:hover{background:rgba(0,0,0,.08)}
+  .edge-url{flex:1;height:32px;border-radius:16px;border:1px solid #c4c9cf;background:#fff;color:#222;padding:0 16px;font-size:13px;outline:none}
+  .edge-page{flex:1;overflow:auto;background:#fff;color:#202020;display:flex;flex-direction:column;align-items:center;padding-top:70px}
+  .edge-page .logo{font-size:56px;font-weight:600;letter-spacing:-2px;margin-bottom:24px;
+    background:linear-gradient(90deg,#0078d4,#00bcf2,#40e0d0);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .edge-search{width:min(560px,86%);height:46px;border-radius:24px;border:1px solid #ccc;box-shadow:0 2px 10px rgba(0,0,0,.08);
+    padding:0 22px;font-size:15px;outline:none;color:#222}
+  .edge-links{display:flex;gap:26px;margin-top:34px;flex-wrap:wrap;justify-content:center}
+  .edge-links a{display:flex;flex-direction:column;align-items:center;gap:8px;color:#333;text-decoration:none;font-size:12px;cursor:default}
+  .edge-links a .gl{font-size:30px;width:56px;height:56px;background:#eef1f4;border-radius:12px;display:grid;place-items:center}
+
+  .photos{height:100%;background:#1b1b1b;padding:14px;overflow:auto;display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:flex-start}
+  .photo{aspect-ratio:1;border-radius:8px;cursor:default;transition:transform .12s}
+  .photo:hover{transform:scale(1.03)}
+
+  .recycle-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#9a9a9a;background:#202020}
+  .recycle-empty .gl{font-size:64px;opacity:.5}
+
+  /* ---------- DIALOGS ---------- */
+  .dlg{position:fixed;z-index:60000;min-width:340px;max-width:460px;background:var(--win-bg);
+    border:1px solid var(--stroke);border-radius:9px;box-shadow:0 30px 80px rgba(0,0,0,.7);
+    overflow:hidden;animation:dlgin .14s ease}
+  @keyframes dlgin{from{transform:scale(.92);opacity:0}}
+  .dlg-head{height:32px;background:var(--win-head);display:flex;align-items:center;justify-content:space-between;padding:0 4px 0 12px;font-size:12.5px;gap:8px}
+  .dlg-head .x{width:38px;height:100%;border:0;background:transparent;color:#e6e6e6;font-size:13px;cursor:default}
+  .dlg-head .x:hover{background:#c42b1c}
+  .dlg-body{padding:18px 16px;font-size:13px;display:flex;gap:14px;line-height:1.5;align-items:flex-start}
+  .dlg-body .big{font-size:32px;line-height:1}
+  .dlg-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 14px 14px}
+  .dlg-btn{border:1px solid var(--stroke);background:#333;border-radius:5px;padding:7px 18px;font-size:12.5px;cursor:default;color:#fff}
+  .dlg-btn:hover{background:#3d3d3d}
+  .dlg-btn.pri{background:var(--accent-solid);border-color:transparent}
+  .dlg-btn.pri:hover{background:#0078d4}
+  .dlg.ad .dlg-head{background:linear-gradient(90deg,#e91e63,#ff9800);color:#fff;font-weight:700}
+  .dlg.ad{border-color:#ff9800;box-shadow:0 0 40px rgba(255,120,0,.5)}
+
+  /* file open/save dialog */
+  .fdlg-list{max-height:190px;overflow:auto;border:1px solid var(--stroke);border-radius:6px;margin-top:10px}
+  .fdlg-row{display:flex;gap:9px;padding:7px 10px;font-size:12.5px;cursor:default}
+  .fdlg-row:hover{background:rgba(255,255,255,.08)}
+  .fdlg-row.sel{background:rgba(120,180,255,.25)}
+  .fdlg-name{width:100%;margin-top:10px;height:30px;background:#1a1a1a;border:1px solid var(--stroke);border-radius:5px;color:#fff;padding:0 10px;outline:none;font-size:12.5px}
+
+  /* wifi list in quick settings */
+  #wifilist{margin-top:14px;border-top:1px solid var(--stroke);padding-top:8px;display:none;max-height:240px;overflow:auto}
+  #wifilist.open{display:block}
+  .wifi-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:6px;font-size:12.5px;cursor:default}
+  .wifi-row:hover{background:rgba(255,255,255,.07)}
+  .wifi-row .sig{font-size:15px;width:20px}
+  .wifi-row .meta{flex:1}
+  .wifi-row small{color:#9a9a9a;display:block;font-size:11px}
+  .wifi-row .conn{color:var(--accent);font-size:11px}
+
+  /* antivirus */
+  .av{height:100%;background:#202020;padding:20px;overflow:auto;font-size:13px}
+  .av-hero{display:flex;align-items:center;gap:16px;background:#1d2b1e;border:1px solid #2e7d32;border-radius:10px;padding:18px}
+  .av-hero.bad{border-color:#c42b1c;background:#3a1d1a}
+  .av-hero .shield{font-size:44px}
+  .av-hero h3{margin:0 0 4px;font-size:16px}
+  .av-hero .sub{color:#9a9a9a;font-size:12px}
+  .av-btn{border:0;border-radius:6px;background:var(--accent-solid);color:#fff;padding:10px 20px;font-size:13px;cursor:default;margin-top:14px}
+  .av-btn:hover{filter:brightness(1.15)}
+  .av-btn.danger{background:#c42b1c}
+  .av-bar{height:6px;border-radius:3px;background:#333;overflow:hidden;margin:12px 0}
+  .av-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+  .av-log{font-family:Consolas,monospace;font-size:11.5px;color:#9a9a9a;height:110px;overflow:auto;background:#1a1a1a;border-radius:6px;padding:8px;margin-top:10px}
+  .av-threat{display:flex;align-items:center;gap:10px;background:#3a1d1a;border:1px solid #c42b1c;border-radius:6px;padding:10px;margin-top:8px;font-size:12.5px}
+  .av-threat .gl{font-size:20px}
+
+  /* edge app store */
+  .store-app{display:flex;align-items:center;gap:14px;border:1px solid #e1e4e8;border-radius:10px;padding:14px;margin-bottom:10px;background:#fff;width:100%}
+  .store-app .gl{font-size:34px}
+  .store-app .inf{flex:1;text-align:left}
+  .store-app .inf b{font-size:14px;color:#111}
+  .store-app .inf small{display:block;color:#777;font-size:11.5px;margin-top:2px}
+  .store-get{border:0;background:#0067c0;color:#fff;border-radius:16px;padding:7px 20px;font-size:12.5px;cursor:default;min-width:92px}
+  .store-get:hover{background:#0078d4}
+  .store-get:disabled{background:#9ec4e0}
+
+  /* BSOD */
+  #bsod{position:fixed;inset:0;z-index:200000;background:#0067c0;display:none;flex-direction:column;justify-content:center;padding:0 12vw;color:#fff;font-weight:300}
+  #bsod .sad{font-size:110px;margin-bottom:18px}
+  #bsod .t1{font-size:24px;line-height:1.45;max-width:660px}
+  #bsod .pct{font-size:15px;margin:22px 0}
+  #bsod .code{font-size:12px;color:#cfe3f5;line-height:1.8}
+
+  /* BIOS */
+  #bios{position:fixed;inset:0;z-index:200001;display:none;background:#0000a8;color:#e0e0e0;font-family:"Consolas","Courier New",monospace;flex-direction:column}
+  #bios .bios-head{background:#a8a8a8;color:#0000a8;font-weight:700;text-align:center;padding:5px;font-size:15px}
+  #bios .bios-tabs{display:flex;background:#0000d0;border-bottom:2px solid #a8a8a8}
+  #bios .bios-tabs span{padding:6px 18px;font-size:14px}
+  #bios .bios-tabs span.act{background:#a8a8a8;color:#0000a8}
+  #bios .bios-body{flex:1;display:flex;padding:20px;gap:24px;font-size:14.5px;line-height:2}
+  #bios .bios-opt{padding:2px 10px;cursor:default}
+  #bios .bios-opt.hotable:hover{background:#a8a8a8;color:#0000a8}
+  #bios .bios-side{width:300px;border-left:2px solid #a8a8a8;padding-left:16px;font-size:12.5px;color:#c8c8c8;line-height:1.8}
+  #bios .bios-foot{background:#a8a8a8;color:#0000a8;padding:4px 14px;font-size:13px}
+  .bios-lgbtn{position:absolute;bottom:18px;left:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);
+    color:#fff;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;opacity:.7}
+  .bios-lgbtn:hover{background:rgba(255,255,255,.25);opacity:1}
+
+  /* photos viewer */
+  .ph{display:flex;flex-direction:column;height:100%;background:#1b1b1b}
+  .ph-bar{height:42px;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:0 12px;background:#232323;border-bottom:1px solid #000;font-size:12.5px}
+  .ph-stage{flex:1;position:relative;display:grid;place-items:center;overflow:hidden}
+  .ph-img{width:min(86%,720px);height:82%;border-radius:8px;display:grid;place-items:center;font-size:110px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .ph-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:17px;cursor:default}
+  .ph-nav:hover{background:rgba(0,0,0,.7)}
+  .photo{position:relative;display:grid;place-items:center;font-size:44px}
+  .photo .pnm{position:absolute;left:6px;bottom:6px;right:6px;font-size:10.5px;color:#fff;text-shadow:0 1px 3px #000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+
+  /* media player */
+  .mp{display:flex;flex-direction:column;height:100%;background:#151515}
+  .mp-stage{flex:1;position:relative;display:grid;place-items:center;overflow:hidden;background:#000}
+  .mp-video{position:absolute;inset:0;display:grid;place-items:center;font-size:120px;background-size:300% 300%;animation:mvbg 14s ease-in-out infinite}
+  @keyframes mvbg{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+  .mp-caption{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.75);text-shadow:0 1px 3px #000}
+  .mp-controls{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#202020}
+  .mp-controls button{width:38px;height:38px;border-radius:50%;border:0;background:#333;color:#fff;font-size:15px;cursor:default}
+  .mp-controls button:hover{background:#444}
+  .mp-controls input[type=range]{flex:1;accent-color:var(--accent)}
+  .mp-controls input[data-vol]{flex:0 1 90px}
+  .mp-time{font-size:11.5px;color:#bbb;min-width:80px;text-align:center}
+  .mp-disc{width:190px;height:190px;border-radius:50%;background:conic-gradient(#3a3a3a 0 25%,#242424 0 50%,#3a3a3a 0 75%,#242424 0);display:grid;place-items:center;font-size:60px;animation:sp 3.5s linear infinite;box-shadow:0 14px 50px rgba(0,0,0,.6)}
+  .mp-eq{position:absolute;bottom:44px;display:flex;gap:5px;align-items:flex-end;height:40px}
+  .mp-eq i{width:6px;background:var(--accent);border-radius:3px;animation:eq .7s ease-in-out infinite alternate}
+  @keyframes eq{from{height:6px}to{height:38px}}
+  .mp.paused .mp-video,.mp.paused .mp-disc,.mp.paused .mp-eq i{animation-play-state:paused}
+
+  /* wallpaper site cards */
+  .wp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;width:100%}
+  .wp-card{border:1px solid #e1e4e8;border-radius:10px;overflow:hidden;background:#fff}
+  .wp-prev{height:100px}
+  .wp-card .wp-i{padding:10px;text-align:left}
+  .wp-card b{font-size:13px;color:#111}
+  .wp-card .wp-btns{display:flex;gap:6px;margin-top:8px}
+  .wp-btn{border:1px solid #c4c9cf;background:#f6f8fa;border-radius:5px;padding:5px 10px;font-size:11.5px;cursor:default;color:#222}
+  .wp-btn:hover{background:#e9edf2}
+  .wp-btn.pri{background:#0067c0;border-color:transparent;color:#fff}
+  .wp-btn.pri:hover{background:#0078d4}
+
+  /* paint */
+  .pt{display:flex;flex-direction:column;height:100%;background:#2b2b2b}
+  .pt-tools{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:8px 12px;background:#232323;border-bottom:1px solid #000;flex-wrap:wrap}
+  .pt-colors{display:flex;gap:5px}
+  .pt-sw{width:22px;height:22px;border-radius:5px;border:2px solid #555;cursor:default;padding:0}
+  .pt-sw.sel{border-color:#fff;box-shadow:0 0 0 2px var(--accent-solid)}
+  .pt-sep{width:1px;height:22px;background:#444}
+  .pt-size{display:flex;align-items:center;gap:6px;font-size:12px;color:#ccc}
+  .pt-size input{accent-color:var(--accent)}
+  .pt-btn{border:1px solid var(--stroke);background:#333;color:#fff;border-radius:5px;padding:6px 12px;font-size:12px;cursor:default}
+  .pt-btn:hover{background:#3d3d3d}.pt-btn.pri{background:var(--accent-solid);border-color:transparent}
+  .pt-stage{flex:1;background:#555;display:grid;place-items:center;overflow:hidden;padding:8px}
+  .pt-stage canvas{background:#fff;cursor:crosshair;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:100%;max-height:100%}
+
+  /* task manager */
+  .tm{display:flex;flex-direction:column;height:100%;background:#202020;font-size:12.5px}
+  .tm-sum{display:flex;gap:14px;padding:14px 16px;border-bottom:1px solid #000}
+  .tm-meter{flex:1;font-size:12px;color:#ccc}
+  .tm-bar{height:8px;border-radius:4px;background:#3a3a3a;overflow:hidden;margin:5px 0}
+  .tm-bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .5s}
+  .tm-bar i.hot{background:#e0491c}
+  .tm-bar.mem i{background:#8a3ffc}
+  .tm-head,.tm-row{display:grid;grid-template-columns:1fr 60px 90px 90px;align-items:center;gap:8px;padding:7px 16px}
+  .tm-head{color:#9a9a9a;font-size:11px;border-bottom:1px solid #000;text-transform:uppercase;letter-spacing:.5px}
+  .tm-list{flex:1;overflow:auto}
+  .tm-row:hover{background:rgba(255,255,255,.05)}
+  .tm-row.mal{color:#ff8a80}
+  .tm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tm-end{border:1px solid var(--stroke);background:#333;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:default}
+  .tm-end:hover{background:#c42b1c}
+
+  /* minesweeper */
+  .ms{display:flex;flex-direction:column;align-items:center;height:100%;background:#202020;padding:14px;gap:12px}
+  .ms-bar{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:340px;background:#2b2b2b;border-radius:8px;padding:8px 14px;font-size:15px}
+  .ms-face{font-size:22px;border:0;background:transparent;cursor:default}
+  .ms-grid{display:grid;gap:2px;background:#111;padding:6px;border-radius:6px}
+  .ms-cell{width:30px;height:30px;border:0;border-radius:3px;background:#3a3a3a;font-size:15px;font-weight:700;cursor:default;display:grid;place-items:center;padding:0}
+  .ms-cell:hover{background:#454545}
+  .ms-cell.rev{background:#252525}
+  .ms-cell.flag{background:#3a2f1a}
+  .ms-cell[data-n="1"]{color:#4cc2ff}.ms-cell[data-n="2"]{color:#5cd68a}.ms-cell[data-n="3"]{color:#ff6b6b}
+  .ms-cell[data-n="4"]{color:#c58af9}.ms-cell[data-n="5"]{color:#ff8c42}.ms-cell[data-n="6"]{color:#40e0d0}
+  .ms-cell[data-n="7"]{color:#eee}.ms-cell[data-n="8"]{color:#999}
+  .ms-msg{font-size:13px;color:#bbb;min-height:18px}
+
+  /* snake */
+  .sn{display:flex;flex-direction:column;align-items:center;height:100%;background:#151b26;padding:14px;gap:10px}
+  .sn-hud{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:360px;font-size:13px;color:#cfe0f0}
+  .sn-hud b{color:var(--accent)}
+  .sn-btn{border:0;background:var(--accent-solid);color:#fff;border-radius:6px;padding:7px 16px;font-size:12.5px;cursor:default}
+  .sn-btn:hover{filter:brightness(1.12)}
+  .sn canvas{background:#0c1220;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:100%}
+  .sn-tip{font-size:11px;color:#7891ad}
+
+  /* html viewer */
+  .hv{display:flex;flex-direction:column;height:100%;background:#fff}
+  .hv-bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 12px;background:#dfe3e8;border-bottom:1px solid #c4c9cf}
+  .hv-url{flex:1;font-size:12px;color:#333;background:#fff;border:1px solid #c4c9cf;border-radius:14px;padding:5px 14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hv-frame{flex:1;border:0;width:100%;background:#fff}
+
+  /* malware overlays */
+  #heat{position:fixed;inset:0;z-index:7000;pointer-events:none;display:none;
+    box-shadow:inset 0 0 160px 40px rgba(200,40,10,.32);animation:heatpulse 2.6s ease-in-out infinite}
+  @keyframes heatpulse{50%{box-shadow:inset 0 0 230px 70px rgba(225,60,10,.5)}}
+  .mal-widget{position:fixed;z-index:8200;background:rgba(14,14,18,.93);border:1px solid #333;border-radius:8px;
+    font-family:Consolas,monospace;color:#ddd;font-size:11.5px;box-shadow:0 12px 34px rgba(0,0,0,.65)}
+  #miner-w{top:58px;right:14px;width:214px;padding:11px 13px;line-height:1.8}
+  #miner-w .mh{color:#f7b500}#miner-w .cpu{color:#ff5a4d}
+  #miner-w .bar{height:5px;background:#333;border-radius:3px;margin:6px 0;overflow:hidden}
+  #miner-w .bar i{display:block;height:100%;background:linear-gradient(90deg,#e0491c,#ffb000);width:100%;animation:minerbar 1.2s ease-in-out infinite}
+  @keyframes minerbar{50%{opacity:.55}}
+  #backdoor-w{bottom:58px;left:14px;width:342px;height:184px;overflow:hidden;padding:8px 11px;color:#28d017;background:rgba(0,9,0,.92);border-color:#123d0e}
+  #backdoor-w .bd-head{color:#7cff6b;border-bottom:1px solid #143d10;padding-bottom:4px;margin-bottom:5px;font-size:11px}
+  #backdoor-w .bd-log{height:138px;overflow:hidden;line-height:1.55}
+  .bd-cursor{display:inline-block;width:7px;height:12px;background:#28d017;animation:blink 1s steps(1) infinite;vertical-align:-1px}
+  @keyframes blink{50%{opacity:0}}
+  #keylog-w{bottom:58px;left:50%;transform:translateX(-50%);padding:7px 15px;color:#ffb37a;max-width:74vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #keylog-w b{color:#ffd08a}
+  #spy-w{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:8300;background:rgba(24,0,0,.92);border:1px solid #7a1010;
+    color:#ff6a5d;padding:6px 15px;border-radius:20px;font-size:12px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 22px rgba(0,0,0,.55)}
+  #spy-w .dot{width:9px;height:9px;border-radius:50%;background:#ff2d2d;animation:blink 1.1s steps(1) infinite}
+  .mal-toast{position:fixed;right:14px;z-index:8400;background:rgba(20,20,24,.96);border:1px solid #444;border-left:3px solid #e0491c;
+    border-radius:6px;padding:10px 14px;font-size:12px;color:#eee;box-shadow:0 8px 26px rgba(0,0,0,.55);max-width:260px;animation:toastin .2s ease}
+  @keyframes toastin{from{transform:translateX(30px);opacity:0}}
+  /* ransom overlay */
+  #ransom{position:fixed;inset:0;z-index:150500;display:none;background:rgba(18,0,0,.97);
+    color:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;overflow:auto}
+  #ransom .skull{font-size:76px;line-height:1}
+  #ransom h1{font-size:28px;color:#ff3b3b;margin:8px 0}
+  #ransom .rmsg{max-width:640px;font-size:13.5px;line-height:1.7;color:#f0d0d0}
+  #ransom .rmsg small{color:#c99}
+  #ransom .rbox{background:rgba(0,0,0,.45);border:1px solid #7a1010;border-radius:10px;padding:16px 22px;margin:16px 0;max-width:620px}
+  #ransom .rtimer{font-size:38px;font-family:Consolas,monospace;color:#ffb000;margin:6px 0}
+  #ransom .raddr{font-family:Consolas,monospace;background:#000;padding:8px 12px;border-radius:6px;font-size:12.5px;color:#7cff6b;word-break:break-all;margin-top:6px}
+  #ransom .rbtns{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;justify-content:center}
+  #ransom .rbtn{border:0;border-radius:6px;padding:11px 22px;font-size:13px;cursor:default}
+  #ransom .rbtn.pay{background:#e0491c;color:#fff}#ransom .rbtn.dec{background:#0067c0;color:#fff}
+  #ransom .rbtn.x{background:transparent;border:1px solid #555;color:#bbb}
+
+  /* RECOVERY (WinRE) */
+  #recovery{position:fixed;inset:0;z-index:150000;display:none;background:#0067b8;color:#fff;font-weight:300;
+    flex-direction:column;align-items:center;justify-content:center}
+  #recovery .r-wrap{width:min(680px,88vw)}
+  #recovery.black{background:#000}
+  #recovery h1{font-size:36px;font-weight:200;margin:0 0 8px}
+  #recovery h2{font-size:22px;font-weight:300;margin:0 0 22px;color:#e8f1fa}
+  #recovery .r-sub{font-size:13.5px;color:#d6e6f5;margin:14px 0 26px;line-height:1.7;max-width:620px}
+  .r-tiles{display:flex;flex-direction:column;gap:3px;max-width:420px}
+  .r-tile{display:flex;align-items:center;gap:16px;background:rgba(255,255,255,.10);padding:13px 16px;cursor:default;font-size:14px}
+  .r-tile:hover{background:rgba(255,255,255,.22)}
+  .r-tile .ric{width:38px;height:38px;flex:0 0 auto;background:rgba(255,255,255,.15);display:grid;place-items:center;font-size:19px}
+  .r-tile small{display:block;color:#cfe0f0;font-size:11.5px;margin-top:2px}
+  .r-back{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;padding:9px 26px;font-size:13px;cursor:default;margin-right:8px}
+  .r-back:hover{background:rgba(255,255,255,.15)}
+  .r-center{display:flex;flex-direction:column;align-items:center;gap:22px;font-size:19px}
+  .r-spin{width:38px;height:38px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite}
+  .r-term{background:#0c0c0c;width:min(760px,90vw);height:56vh;padding:10px 12px;font-family:"Consolas",monospace;
+    font-size:13px;color:#e0e0e0;overflow:auto;line-height:1.45;text-align:left}
+  .r-term input{background:transparent;border:0;outline:0;color:#e0e0e0;font-family:inherit;font-size:13px;flex:1}
+
+  /* system corruption fx */
+  body.glitch #desktop{animation:glch 4s steps(1) infinite}
+  @keyframes glch{0%,90%{filter:none}91%{filter:hue-rotate(90deg) saturate(3)}93%{filter:invert(1)}95%{filter:hue-rotate(-140deg) contrast(2)}96%,100%{filter:none}}
+  body.glitch #taskbar{animation:tbglch 6s steps(1) infinite}
+  @keyframes tbglch{0%,94%{transform:none}95%{transform:translateY(2px) skewX(1deg)}97%{transform:translateY(-1px)}100%{transform:none}}
+  body.flashinv{filter:invert(1)}
+
+  .fx-tile.sel{background:rgba(120,180,255,.25);outline:1px solid rgba(140,190,255,.5)}
+  .fx-tile.dragging,.dicon.dragging{opacity:.4}
+  .fx-tile.drop-hover,.dicon.drop-hover{outline:2px solid var(--accent);background:rgba(120,180,255,.22);border-radius:6px}
+  .fx-side .item.drop-hover{background:rgba(120,180,255,.28);outline:1px solid var(--accent)}
+  .dicon.recycle-hot{outline:2px solid #ff6b6b;background:rgba(255,80,80,.22);border-radius:6px}
+  #desktop.drop-target{outline:3px dashed rgba(120,180,255,.45);outline-offset:-8px}
+  .rc-bar{display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid #000;background:#232323;flex:0 0 auto}
+
+  ::-webkit-scrollbar{width:12px;height:12px}
+  ::-webkit-scrollbar-thumb{background:#4a4a4a;border-radius:6px;border:3px solid transparent;background-clip:content-box}
+  ::-webkit-scrollbar-thumb:hover{background:#5c5c5c;background-clip:content-box}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+
+<!-- DESKTOP -->
+<div id="desktop" class="dark">
+  <div id="icons"></div>
+</div>
+
+<!-- TASKBAR -->
+<div id="taskbar">
+  <div id="tb-left">
+    <button class="tbtn" id="widgetsbtn" title="Widgets"><span class="gl">🌤️</span></button>
+  </div>
+  <div id="tb-center">
+    <button class="tbtn" id="startbtn" title="Start"><span class="gl">⊞</span></button>
+    <button class="tbtn" id="searchbtn" title="Search"><span class="gl">🔍</span></button>
+    <div id="tb-apps" style="display:flex;gap:4px"></div>
+  </div>
+  <div id="tb-right">
+    <button class="trayitem" id="chevron" title="Hidden icons"><span class="tray-ic">⌃</span></button>
+    <button class="trayitem" id="quickbtn" title="Network / Sound / Battery">
+      <span class="tray-ic">📶</span><span class="tray-ic">🔊</span><span class="tray-ic">🔋</span>
+    </button>
+    <button class="trayitem" id="tray-clock">
+      <span id="clk-time">12:00 PM</span>
+      <small id="clk-date">1/1/2026</small>
+    </button>
+  </div>
+</div>
+
+<!-- START MENU -->
+<div id="startmenu" class="flyout">
+  <input id="start-search" placeholder="Search for apps, settings, and documents">
+  <div class="sm-head"><b>Pinned</b><button class="allbtn">All apps &nbsp;›</button></div>
+  <div class="sm-grid" id="sm-grid"></div>
+  <div id="startfoot">
+    <div class="sm-user"><div class="avatar">U</div><span>User</span></div>
+    <button id="powerbtn" title="Power">⏻</button>
+  </div>
+</div>
+
+<!-- QUICK SETTINGS -->
+<div id="quick" class="flyout">
+  <div class="qs-grid">
+    <div class="qs-tile on" data-q="wifi"><span class="gl">📶</span> Wi-Fi</div>
+    <div class="qs-tile" data-q="bt"><span class="gl">🔵</span> Bluetooth</div>
+    <div class="qs-tile" data-q="air"><span class="gl">✈️</span> Airplane</div>
+    <div class="qs-tile" data-q="save"><span class="gl">🔋</span> Battery saver</div>
+  </div>
+  <div class="qs-slider"><span>🔆</span><input type="range" min="0" max="100" value="80" id="bright"></div>
+  <div class="qs-slider"><span>🔊</span><input type="range" min="0" max="100" value="65" id="vol"></div>
+  <div id="wifilist"></div>
+</div>
+
+<!-- CALENDAR -->
+<div id="cal" class="flyout">
+  <div class="cbig" id="cal-time">12:00:00 PM</div>
+  <div class="cdate" id="cal-date">Wednesday, July 8, 2026</div>
+  <div class="cal-grid" id="cal-grid"></div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx"></div>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="clock-big" id="lg-time">12:00</div>
+  <div class="date-big" id="lg-date">Wednesday, July 8</div>
+  <div class="lg-user">
+    <div class="avatar-lg">U</div>
+    <div class="lg-name">User</div>
+    <div class="lg-row">
+      <input id="lg-pass" type="password" placeholder="PIN or password" autocomplete="off">
+      <button class="go" id="lg-go">→</button>
+    </div>
+    <div class="hint">Press → or Enter to sign in (any value works)</div>
+  </div>
+  <button class="bios-lgbtn" id="biosbtn">⚙ BIOS Setup</button>
+</div>
+
+<!-- SHUTDOWN -->
+<div id="shutdown"><div class="spin"></div><div id="sd-text">Shutting down…</div></div>
+
+<!-- BSOD -->
+<div id="bsod">
+  <div class="sad">:(</div>
+  <div class="t1">Your PC ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.</div>
+  <div class="pct"><span id="bsod-pct">0</span>% complete</div>
+  <div class="code">Stop code: <span id="bsod-code">CRITICAL_PROCESS_DIED</span><br>
+    What failed: <span id="bsod-what">systemwinclone.sys</span><br><br>
+    Tip: you can factory-reset WinClone from the “⚙ BIOS Setup” button on the sign-in screen.</div>
+</div>
+
+<!-- hidden real-file import input -->
+<input type="file" id="fileimport" accept="image/*" multiple style="display:none">
+
+<!-- MALWARE OVERLAYS -->
+<div id="heat"></div>
+<div id="ransom"></div>
+
+<!-- RECOVERY (WinRE) -->
+<div id="recovery"></div>
+
+<!-- BIOS -->
+<div id="bios">
+  <div class="bios-head">WinClone BIOS Setup Utility — American Clonetrends v4.8</div>
+  <div class="bios-tabs"><span class="act">Main</span><span>Advanced</span><span>Boot</span><span>Exit</span></div>
+  <div class="bios-body">
+    <div style="flex:1">
+      <div class="bios-opt">System Time ......... <span id="bios-time">--:--:--</span></div>
+      <div class="bios-opt">System Date ......... <span id="bios-date">--/--/----</span></div>
+      <div class="bios-opt">Processor ........... WinClone Core i9 @ 3.60GHz</div>
+      <div class="bios-opt">Installed Memory .... 32768 MB OK</div>
+      <div class="bios-opt">System Health ....... <span id="bios-health">OK</span></div>
+      <br>
+      <div class="bios-opt hotable" id="bios-reset">&gt; Restore Factory Defaults (wipe &amp; reinstall WinClone)</div>
+      <div class="bios-opt hotable" id="bios-exit">&gt; Exit Without Saving</div>
+    </div>
+    <div class="bios-side">←→ Select Screen<br>↑↓ Select Item<br>Enter: Select<br>Esc: Exit<br><br>
+      <b>Restore Factory Defaults</b> erases all files, downloads, settings and infections, and reinstalls WinClone system files. Use this if the system is corrupted.</div>
+  </div>
+  <div class="bios-foot">v4.8 (C)Copyright 2026, WinClone Megatrends, Inc.</div>
+</div>
+
+<script>
+"use strict";
+/* ============================ APP REGISTRY ============================ */
+const APPS = {
+  explorer:  {title:"File Explorer", icon:"📁", w:760, h:500, build:buildExplorer},
+  notepad:   {title:"Notepad",       icon:"📝", w:600, h:440, build:buildNotepad},
+  calc:      {title:"Calculator",    icon:"🧮", w:340, h:500, build:buildCalc},
+  terminal:  {title:"Terminal",      icon:"🖥️", w:660, h:420, build:buildTerminal},
+  settings:  {title:"Settings",      icon:"⚙️", w:780, h:540, build:buildSettings},
+  edge:      {title:"Microsoft Edge",icon:"🌐", w:820, h:560, build:buildEdge},
+  photos:    {title:"Photos",        icon:"🖼️", w:700, h:520, build:buildPhotos},
+  media:     {title:"Media Player",  icon:"🎞️", w:720, h:520, build:buildMedia},
+  recycle:   {title:"Recycle Bin",   icon:"🗑️", w:560, h:420, build:buildRecycle},
+  defender:  {title:"Cork Defender", icon:"🛡️", w:620, h:540, build:buildDefender},
+  paint:     {title:"Paint",         icon:"🎨", w:720, h:560, build:buildPaint},
+  taskmgr:   {title:"Task Manager",  icon:"📊", w:640, h:520, build:buildTaskmgr},
+  mines:     {title:"Minesweeper",   icon:"💣", w:400, h:480, build:buildMines},
+  snake:     {title:"Snake",         icon:"🐍", w:440, h:520, build:buildSnake},
+  archive:   {title:"Archive",       icon:"🗜️", w:560, h:420, build:buildArchive, hidden:true},
+  htmlview:  {title:"HTML Viewer",   icon:"🌐", w:760, h:560, build:buildHtmlView, hidden:true},
+};
+const PINNED = ["edge","explorer","notepad","calc","photos","settings","terminal","defender","recycle"];
+const TASKBAR_PINS = ["explorer","edge","notepad","terminal"];
+const DESKTOP_ICONS = [
+  {app:"recycle",  label:"Recycle Bin"},
+  {app:"explorer", label:"This PC"},
+  {app:"edge",     label:"Microsoft Edge"},
+  {app:"defender", label:"Cork Defender"},
+  {app:"paint",    label:"Paint"},
+  {app:"taskmgr",  label:"Task Manager"},
+  {app:"mines",    label:"Minesweeper"},
+  {app:"snake",    label:"Snake"},
+];
+
+/* ============================ STATE ============================ */
+const state = {z:20, wins:{}, focused:null};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+function el(tag, cls, html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;}
+const deskArea = () => ({w:innerWidth, h:innerHeight-48});
+
+/* ============================ WINDOW MANAGER ============================ */
+function openApp(id){
+  const app = APPS[id]; if(!app) return;
+  if(state.wins[id]){ const w=state.wins[id]; if(w.min) toggleMin(id,false); focusWin(id); return; }
+
+  const win = el("div","window"); win.dataset.app=id;
+  const area = deskArea();
+  const w = Math.min(app.w, area.w-40), h = Math.min(app.h, area.h-40);
+  const openCount = Object.keys(state.wins).length;
+  let left = Math.max(20, (area.w-w)/2 + (openCount%6)*26 - 60);
+  let top  = Math.max(16, (area.h-h)/2 + (openCount%6)*22 - 50);
+  Object.assign(win.style,{width:w+"px",height:h+"px",left:left+"px",top:top+"px",zIndex:++state.z});
+
+  win.innerHTML = `
+    <div class="titlebar">
+      <div class="tb-title"><span class="ic">${app.icon}</span><span class="tt">${app.title}</span></div>
+      <div class="tb-controls">
+        <button class="tb-btn min" title="Minimize"><svg viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.2"/></svg></button>
+        <button class="tb-btn max" title="Maximize"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
+        <button class="tb-btn close" title="Close"><svg viewBox="0 0 12 12"><line x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.2"/><line x1="10.5" y1="1.5" x2="1.5" y2="10.5" stroke="currentColor" stroke-width="1.2"/></svg></button>
+      </div>
+    </div>
+    <div class="window-body"></div>`;
+  ["n","s","e","w","ne","nw","se","sw"].forEach(d=>{const h=el("div","rz rz-"+d);h.dataset.dir=d;win.appendChild(h);});
+  $("#desktop").appendChild(win);
+
+  const rec = {el:win, appId:id, min:false, max:false, prev:null};
+  state.wins[id]=rec;
+
+  app.build(win.querySelector(".window-body"), win, rec);
+
+  win.querySelector(".tb-btn.min").onclick = e=>{e.stopPropagation(); toggleMin(id,true);};
+  win.querySelector(".tb-btn.max").onclick = e=>{e.stopPropagation(); toggleMax(id);};
+  win.querySelector(".tb-btn.close").onclick = e=>{e.stopPropagation(); closeWin(id);};
+  win.querySelector(".titlebar").addEventListener("dblclick", ()=>toggleMax(id));
+  win.addEventListener("mousedown", ()=>focusWin(id));
+  makeDraggable(win, rec);
+  makeResizable(win, rec);
+
+  requestAnimationFrame(()=>win.classList.add("show"));
+  addTaskItem(id);
+  focusWin(id);
+}
+
+function focusWin(id){
+  const rec = state.wins[id]; if(!rec) return;
+  rec.el.style.zIndex = ++state.z;
+  state.focused = id;
+  updateTaskItems();
+}
+function closeWin(id){
+  const rec = state.wins[id]; if(!rec) return;
+  rec.el.classList.remove("show");
+  setTimeout(()=>rec.el.remove(),140);
+  delete state.wins[id];
+  removeTaskItem(id);
+  updateTaskItems();
+}
+function toggleMin(id, force){
+  const rec = state.wins[id]; if(!rec) return;
+  const min = force!=null ? force : !rec.min;
+  rec.min = min;
+  rec.el.classList.toggle("min", min);
+  if(!min){ rec.el.style.zIndex = ++state.z; state.focused=id; }
+  else if(state.focused===id){ state.focused=null; }
+  updateTaskItems();
+}
+function toggleMax(id){
+  const rec = state.wins[id]; if(!rec) return;
+  const win = rec.el;
+  if(rec.max){
+    Object.assign(win.style, rec.prev);
+    win.classList.remove("max"); rec.max=false;
+  }else{
+    rec.prev = {left:win.style.left, top:win.style.top, width:win.style.width, height:win.style.height};
+    const a=deskArea();
+    Object.assign(win.style,{left:"0px",top:"0px",width:a.w+"px",height:a.h+"px"});
+    win.classList.add("max"); rec.max=true;
+  }
+  focusWin(id);
+}
+
+function makeDraggable(win, rec){
+  const bar = win.querySelector(".titlebar");
+  bar.addEventListener("mousedown", e=>{
+    if(e.target.closest(".tb-btn")) return;
+    focusWin(rec.appId);
+    if(rec.max){ // un-maximize on drag, keep cursor grip
+      const ratio = e.clientX / innerWidth;
+      toggleMax(rec.appId);
+      win.style.top="0px";
+      win.style.left = (e.clientX - parseFloat(win.style.width)*ratio)+"px";
+    }
+    const sx=e.clientX, sy=e.clientY, ox=parseFloat(win.style.left), oy=parseFloat(win.style.top);
+    const move = ev=>{
+      let nx=ox+(ev.clientX-sx), ny=oy+(ev.clientY-sy);
+      ny=Math.max(0,ny); nx=Math.min(Math.max(nx,-parseFloat(win.style.width)+80), innerWidth-80);
+      win.style.left=nx+"px"; win.style.top=ny+"px";
+      snapHint(ev);
+    };
+    const up = ev=>{
+      document.removeEventListener("mousemove",move);
+      document.removeEventListener("mouseup",up);
+      applySnap(ev, rec);
+    };
+    document.addEventListener("mousemove",move);
+    document.addEventListener("mouseup",up);
+  });
+}
+let snapZone=null;
+function snapHint(ev){
+  snapZone = ev.clientY<6 ? "top" : ev.clientX<6 ? "left" : ev.clientX>innerWidth-6 ? "right" : null;
+}
+function applySnap(ev, rec){
+  if(!snapZone) return;
+  const win=rec.el, a=deskArea();
+  rec.prev = {left:win.style.left, top:win.style.top, width:win.style.width, height:win.style.height};
+  if(snapZone==="top"){ if(!rec.max) toggleMax(rec.appId); }
+  else if(snapZone==="left"){ Object.assign(win.style,{left:"0px",top:"0px",width:(a.w/2)+"px",height:a.h+"px"}); }
+  else if(snapZone==="right"){ Object.assign(win.style,{left:(a.w/2)+"px",top:"0px",width:(a.w/2)+"px",height:a.h+"px"}); }
+  snapZone=null;
+}
+function makeResizable(win, rec){
+  win.querySelectorAll(".rz").forEach(handle=>{
+    handle.addEventListener("mousedown", e=>{
+      e.stopPropagation(); focusWin(rec.appId);
+      const dir=handle.dataset.dir;
+      const sx=e.clientX, sy=e.clientY;
+      const ox=parseFloat(win.style.left), oy=parseFloat(win.style.top);
+      const ow=parseFloat(win.style.width), oh=parseFloat(win.style.height);
+      const move=ev=>{
+        let dx=ev.clientX-sx, dy=ev.clientY-sy;
+        let L=ox,T=oy,W=ow,H=oh;
+        if(dir.includes("e")) W=Math.max(280,ow+dx);
+        if(dir.includes("s")) H=Math.max(160,oh+dy);
+        if(dir.includes("w")){ W=Math.max(280,ow-dx); L=ox+(ow-W); }
+        if(dir.includes("n")){ H=Math.max(160,oh-dy); T=oy+(oh-H); }
+        Object.assign(win.style,{left:L+"px",top:T+"px",width:W+"px",height:H+"px"});
+      };
+      const up=()=>{document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);};
+      document.addEventListener("mousemove",move);
+      document.addEventListener("mouseup",up);
+    });
+  });
+}
+
+/* ============================ TASKBAR ITEMS ============================ */
+function renderTaskbarPins(){
+  const c = $("#tb-apps"); c.innerHTML="";
+  TASKBAR_PINS.forEach(id=>{
+    const b = el("button","tbtn pin"); b.dataset.app=id;
+    b.innerHTML = `<span class="gl">${APPS[id].icon}</span>`;
+    b.title = APPS[id].title;
+    b.onclick = ()=>taskClick(id);
+    c.appendChild(b);
+  });
+}
+function addTaskItem(id){
+  const c = $("#tb-apps");
+  let b = c.querySelector(`[data-app="${id}"]`);
+  if(!b){
+    b = el("button","tbtn"); b.dataset.app=id;
+    b.innerHTML = `<span class="gl">${APPS[id].icon}</span>`;
+    b.title = APPS[id].title;
+    b.onclick = ()=>taskClick(id);
+    c.appendChild(b);
+  }
+  updateTaskItems();
+}
+function removeTaskItem(id){
+  if(TASKBAR_PINS.includes(id)) return;
+  const b=$("#tb-apps").querySelector(`[data-app="${id}"]`);
+  if(b) b.remove();
+}
+function updateTaskItems(){
+  document.querySelectorAll("#tb-apps .tbtn").forEach(b=>{
+    const id=b.dataset.app, rec=state.wins[id];
+    b.classList.toggle("run", !!rec);
+    b.classList.toggle("active", !!rec && !rec.min && state.focused===id);
+  });
+}
+function taskClick(id){
+  const rec = state.wins[id];
+  if(!rec){ openApp(id); return; }
+  if(rec.min){ toggleMin(id,false); focusWin(id); }
+  else if(state.focused===id){ toggleMin(id,true); }
+  else focusWin(id);
+}
+
+/* ============================ DESKTOP ICONS ============================ */
+function renderDesktopIcons(){
+  const c=$("#icons"); if(!c) return; c.innerHTML="";
+  const sel=e=>{ document.querySelectorAll(".dicon.sel").forEach(x=>x.classList.remove("sel")); e.currentTarget.classList.add("sel"); e.stopPropagation(); };
+  const dpath=[...HOME_PATH,"Desktop"];
+  DESKTOP_ICONS.forEach(d=>{
+    const i=el("div","dicon");
+    i.innerHTML=`<div class="gl">${APPS[d.app].icon}</div><div class="lbl">${d.label}</div>`;
+    i.onclick=sel;
+    i.ondblclick=()=>openApp(d.app);
+    if(d.app==="recycle"){ // drop a file here to delete it
+      i.addEventListener("dragover",e=>{ if(DRAG){ e.preventDefault(); i.classList.add("recycle-hot"); } });
+      i.addEventListener("dragleave",()=>i.classList.remove("recycle-hot"));
+      i.addEventListener("drop",e=>{ if(!DRAG) return; e.preventDefault(); e.stopPropagation(); i.classList.remove("recycle-hot"); deleteAt(DRAG.path,DRAG.name); });
+    }
+    c.appendChild(i);
+  });
+  const dt=nodeAt(dpath);
+  if(dt&&dt.children) Object.keys(dt.children).forEach(name=>{
+    const item=dt.children[name];
+    const glyph=item.folder?"📁":(item.archive?"🗜️":(item.icon||"📄"));
+    const i=el("div","dicon");
+    i.innerHTML=`<div class="gl">${glyph}</div><div class="lbl">${esc(name)}</div>`;
+    i.onclick=sel;
+    i.ondblclick=()=>fsOpen(dpath,name,item);
+    i.oncontextmenu=e=>{ e.preventDefault(); e.stopPropagation(); fsItemMenu(e.clientX,e.clientY,dpath,name,item); };
+    makeDragSource(i,dpath,name,item);
+    if(item.folder) makeDropTarget(i,()=>[...dpath,name]);
+    c.appendChild(i);
+  });
+}
+
+/* ============================ START / FLYOUTS ============================ */
+function renderStartGrid(filter){
+  const g=$("#sm-grid"); g.innerHTML="";
+  Object.keys(APPS).filter(id=>!APPS[id].hidden && (!filter || APPS[id].title.toLowerCase().includes(filter.toLowerCase())))
+    .forEach(id=>{
+      const a=el("div","sm-app");
+      a.innerHTML=`<span class="gl">${APPS[id].icon}</span><span class="nm">${APPS[id].title}</span>`;
+      a.onclick=()=>{ closeFlyouts(); openApp(id); };
+      g.appendChild(a);
+    });
+}
+function closeFlyouts(){ document.querySelectorAll(".flyout.open").forEach(f=>f.classList.remove("open")); }
+function toggleFlyout(sel){
+  const f=$(sel), wasOpen=f.classList.contains("open");
+  closeFlyouts();
+  if(!wasOpen) f.classList.add("open");
+}
+
+/* ============================ CLOCK / CALENDAR ============================ */
+function tick(){
+  const d=new Date();
+  const time = d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  const dateS = d.toLocaleDateString();
+  $("#clk-time").textContent = time;
+  $("#clk-date").textContent = dateS;
+  $("#lg-time").textContent = d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  $("#lg-date").textContent = d.toLocaleDateString([], {weekday:"long", month:"long", day:"numeric"});
+  $("#cal-time").textContent = d.toLocaleTimeString();
+  $("#cal-date").textContent = d.toLocaleDateString([], {weekday:"long", year:"numeric", month:"long", day:"numeric"});
+}
+function renderCalendar(){
+  const g=$("#cal-grid"); g.innerHTML="";
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth(), today=now.getDate();
+  ["Su","Mo","Tu","We","Th","Fr","Sa"].forEach(d=>g.appendChild(el("div","dow",d)));
+  const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  for(let i=0;i<first;i++) g.appendChild(el("div","cd",""));
+  for(let d=1;d<=days;d++){ const c=el("div","cd"+(d===today?" today":""),d); g.appendChild(c); }
+}
+
+/* ============================ CONTEXT MENU ============================ */
+function showCtx(x,y,items){
+  const m=$("#ctx"); m.innerHTML="";
+  items.forEach(it=>{
+    if(it==="sep"){ m.appendChild(el("div","ctx-sep")); return; }
+    const row=el("div","ctx-item",`<span class="gl">${it.icon||""}</span><span>${it.label}</span>${it.arrow?'<span class="arw">›</span>':''}`);
+    if(it.action) row.onclick=ev=>{ ev.stopPropagation(); m.style.display="none"; it.action(); };
+    m.appendChild(row);
+  });
+  m.style.display="block";
+  const bw=m.offsetWidth, bh=m.offsetHeight;
+  m.style.left=Math.min(x, innerWidth-bw-6)+"px";
+  m.style.top =Math.min(y, innerHeight-bh-6)+"px";
+}
+document.addEventListener("contextmenu", e=>{
+  e.preventDefault();
+  if(e.target.closest(".window")) { showCtx(e.clientX,e.clientY,[
+      {icon:"✂️",label:"Cut"},{icon:"📋",label:"Copy"},{icon:"📄",label:"Paste"},"sep",
+      {icon:"🔄",label:"Reload",action:()=>location.reload()}
+  ]); return; }
+  const dpath=[...HOME_PATH,"Desktop"];
+  const menu=[
+    {icon:"🔄",label:"Refresh", action:()=>renderDesktopIcons()},
+    "sep",
+    {icon:"📄",label:"New", arrow:true, action:()=>newMenu(e.clientX,e.clientY,dpath)},
+    {icon:"📥",label:"Import image…", action:()=>importImages(dpath)},
+  ];
+  if(CLIP) menu.push({icon:"📋",label:"Paste",action:()=>clipPaste(dpath)});
+  menu.push("sep",
+    {icon:"🖥️",label:"Display settings", action:()=>openApp("settings")},
+    {icon:"🎨",label:"Personalize", action:()=>openApp("settings")},
+    "sep",
+    {icon:"🖥️",label:"Open Terminal", action:()=>openApp("terminal")});
+  showCtx(e.clientX,e.clientY,menu);
+});
+document.addEventListener("click", e=>{
+  if(!e.target.closest("#ctx")) $("#ctx").style.display="none";
+  if(!e.target.closest(".flyout") && !e.target.closest("#startbtn") && !e.target.closest("#quickbtn")
+     && !e.target.closest("#tray-clock") && !e.target.closest("#searchbtn")) closeFlyouts();
+  if(!e.target.closest(".dicon")) document.querySelectorAll(".dicon.sel").forEach(x=>x.classList.remove("sel"));
+});
+
+/* ============================ APP BUILDERS ============================ */
+/* ---- file open/save dialog (shared) ---- */
+function fileDialog(opts){
+  const d=el("div","dlg");
+  d.style.width="380px";
+  d.innerHTML=`<div class="dlg-head"><span>${opts.mode==="open"?"Open file":"Save As"}</span><button class="x">✕</button></div>
+    <div style="padding:12px 14px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="dlg-btn" data-up style="padding:4px 12px">↑</button>
+        <div class="crumb" style="font-size:11.5px;color:#9a9a9a;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"></div>
+      </div>
+      <div class="fdlg-list"></div>
+      ${opts.mode==="save"?'<input class="fdlg-name" placeholder="File name" spellcheck="false">':""}
+    </div>
+    <div class="dlg-foot"><button class="dlg-btn pri" data-ok>${opts.mode==="open"?"Open":"Save"}</button><button class="dlg-btn" data-cancel>Cancel</button></div>`;
+  document.body.appendChild(d);
+  d.style.left=Math.max(10,(innerWidth-400)/2)+"px";
+  d.style.top=Math.max(10,(innerHeight-440)/2)+"px";
+  d.style.zIndex=60000+(++state.z);
+  let path=[...HOME_PATH,"Documents"], sel=null;
+  const list=d.querySelector(".fdlg-list"), crumb=d.querySelector(".crumb"), nameIn=d.querySelector(".fdlg-name");
+  function render(){
+    const n=nodeAt(path); if(!n){ path=[...HOME_PATH]; return render(); }
+    sel=null;
+    crumb.textContent="This PC › "+path.join(" › ");
+    list.innerHTML="";
+    const kids=n.children||{};
+    Object.keys(kids).forEach(k=>{
+      const it=kids[k];
+      const isText=!it.folder && (k.endsWith(".txt")||k.endsWith(".docx")||it.content!=null);
+      if(!it.folder && !isText) return;
+      const row=el("div","fdlg-row",`<span>${it.folder?"📁":(it.icon||"📄")}</span><span>${esc(k)}</span>`);
+      row.onclick=()=>{
+        if(it.folder){ path=[...path,k]; render(); return; }
+        list.querySelectorAll(".sel").forEach(x=>x.classList.remove("sel"));
+        row.classList.add("sel"); sel=k; if(nameIn) nameIn.value=k;
+      };
+      list.appendChild(row);
+    });
+    if(!list.children.length) list.innerHTML=`<div style="color:#888;padding:12px;font-size:12px">Empty folder</div>`;
+  }
+  d.querySelector("[data-up]").onclick=()=>{ if(path.length>1){ path=path.slice(0,-1); render(); } };
+  d.querySelector("[data-cancel]").onclick=()=>d.remove();
+  d.querySelector(".x").onclick=()=>d.remove();
+  d.querySelector("[data-ok]").onclick=()=>{
+    if(opts.mode==="open"){
+      if(!sel) return;
+      d.remove(); opts.cb([...path],sel);
+    }else{
+      let name=(nameIn.value||"").trim();
+      if(!name) return;
+      if(!/\.[a-z0-9]+$/i.test(name)) name+=".txt";
+      d.remove(); opts.cb([...path],name);
+    }
+  };
+  render();
+}
+
+/* ---- notepad ---- */
+let NP_PENDING=null;
+const NP={loader:null};
+function openFileInNotepad(pn){
+  if(state.wins.notepad && NP.loader){
+    if(state.wins.notepad.min) toggleMin("notepad",false);
+    focusWin("notepad"); NP.loader(pn);
+  } else { NP_PENDING=pn; openApp("notepad"); }
+}
+function buildNotepad(body, win){
+  body.innerHTML = `<div style="display:flex;flex-direction:column;height:100%">
+    <div class="np-menu"><span data-m="new">New</span><span data-m="open">Open…</span><span data-m="save">Save</span><span data-m="saveas">Save As…</span></div>
+    <div style="flex:1"><textarea class="np-area" spellcheck="false" placeholder="Type here…"></textarea></div>
+  </div>`;
+  const ta=body.querySelector(".np-area");
+  let cur=null;
+  const setTitle=()=>{ win.querySelector(".tt").textContent=(cur?cur.name:"Untitled")+" — Notepad"; };
+  function load(pn){
+    const parent=nodeAt(pn.path), f=parent&&parent.children[pn.name];
+    if(!f){ winDialog({icon:"❌",title:"Notepad",msg:"File not found."}); return; }
+    ta.value=f.content||""; cur={path:pn.path,name:pn.name}; setTitle();
+  }
+  NP.loader=load;
+  function doSave(path,name){
+    const parent=nodeAt(path); if(!parent||!parent.children) return;
+    const ex=parent.children[name];
+    if(ex&&ex.folder){ winDialog({icon:"❌",title:"Notepad",msg:"A folder with that name already exists."}); return; }
+    parent.children[name]=Object.assign(ex||{icon:"📄"},{content:ta.value});
+    cur={path:[...path],name}; setTitle(); saveFS(); refreshFX();
+  }
+  body.querySelectorAll("[data-m]").forEach(m=>m.onclick=()=>{
+    const k=m.dataset.m;
+    if(k==="new"){ ta.value=""; cur=null; setTitle(); }
+    else if(k==="open") fileDialog({mode:"open",cb:(p,n)=>load({path:p,name:n})});
+    else if(k==="save"){ if(cur) doSave(cur.path,cur.name); else fileDialog({mode:"save",cb:doSave}); }
+    else if(k==="saveas") fileDialog({mode:"save",cb:doSave});
+  });
+  if(NP_PENDING){ load(NP_PENDING); NP_PENDING=null; } else setTitle();
+}
+
+function buildCalc(body){
+  body.innerHTML = `<div class="calc">
+    <div class="calc-disp"><div class="expr"></div><div class="val">0</div></div>
+    <div class="calc-keys">
+      <button class="op" data-k="C">C</button><button class="op" data-k="±">±</button>
+      <button class="op" data-k="%">%</button><button class="op" data-k="/">÷</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button class="op" data-k="*">×</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button class="op" data-k="-">−</button>
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button class="op" data-k="+">+</button>
+      <button data-k="0" style="grid-column:span 2">0</button><button data-k=".">.</button><button class="eq" data-k="=">=</button>
+    </div></div>`;
+  const exprEl=body.querySelector(".expr"), valEl=body.querySelector(".val");
+  let cur="0", expr="";
+  const upd=()=>{ valEl.textContent=cur; exprEl.textContent=expr; };
+  const safeEval=s=>{
+    if(!/^[-+*/(). 0-9]+$/.test(s)) throw 0;
+    return Function("return ("+s+")")();
+  };
+  body.querySelectorAll(".calc-keys button").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k;
+    if(k==="C"){ cur="0"; expr=""; }
+    else if(k==="±"){ cur = cur.startsWith("-")?cur.slice(1):("-"+cur); }
+    else if(k==="%"){ cur = String(parseFloat(cur)/100); }
+    else if(k==="="){
+      try{ const r=safeEval(expr+cur); cur=String(+parseFloat(r).toPrecision(12)); expr=""; }
+      catch(e){ cur="Error"; expr=""; }
+    }
+    else if("+-*/".includes(k)){ expr += cur+" "+({"*":"×","/":"÷","-":"−","+":"+"}[k])+" "; expr=expr.replace(/[×÷−]/g,m=>({"×":"*","÷":"/","−":"-"}[m])); cur="0"; }
+    else if(k==="."){ if(!cur.includes(".")) cur+="."; }
+    else { cur = (cur==="0"||cur==="Error")?k:cur+k; }
+    upd();
+  });
+  upd();
+}
+
+function buildTerminal(body){
+  body.innerHTML = `<div class="term"></div>`;
+  const term = body.querySelector(".term");
+  const banner = `Windows Terminal [Version 10.0.26100]\n(c) WinClone. All rights reserved.\n\n`;
+  let cwd = "C:\\Users\\User";
+  const print = (t,cls)=>{ const d=el("div",cls||""); d.textContent=t; term.appendChild(d); };
+  const printHtml = h=>{ const d=el("div"); d.innerHTML=h; term.appendChild(d); };
+  print(banner);
+  function prompt(){
+    const line = el("div","term-input");
+    line.innerHTML = `<span class="green">${cwd}></span>`;
+    const inp = el("input"); inp.autocomplete="off"; inp.spellcheck=false;
+    line.appendChild(inp); term.appendChild(line); inp.focus();
+    inp.addEventListener("keydown", e=>{
+      if(e.key==="Enter"){
+        const cmd=inp.value; inp.disabled=true;
+        run(cmd.trim()); prompt(); term.scrollTop=term.scrollHeight;
+      }
+    });
+    term.addEventListener("click",()=>{ if(!getSelection().toString()) inp.focus(); });
+  }
+  function run(cmd){
+    const [c,...args]=cmd.split(/\s+/); const a=args.join(" ");
+    switch((c||"").toLowerCase()){
+      case "": break;
+      case "help": printHtml(`Available commands:<br><span class="cyan">help cls dir ver date time whoami echo hostname ipconfig color start calc notepad exit</span>`); break;
+      case "cls": term.innerHTML=""; break;
+      case "ver": print("WinClone [Version 10.0.26100]"); break;
+      case "date": print("The current date is: "+new Date().toLocaleDateString()); break;
+      case "time": print("The current time is: "+new Date().toLocaleTimeString()); break;
+      case "whoami": print("winclone\\user"); break;
+      case "hostname": print("WINCLONE-PC"); break;
+      case "echo": print(a); break;
+      case "ipconfig": printHtml(`Windows IP Configuration<br><br>&nbsp;&nbsp;&nbsp;IPv4 Address. . . . : 192.168.1.42<br>&nbsp;&nbsp;&nbsp;Subnet Mask . . . . : 255.255.255.0<br>&nbsp;&nbsp;&nbsp;Default Gateway . . : 192.168.1.1`); break;
+      case "dir": printHtml(dirListing()); break;
+      case "start": if(APPS[a]) openApp(a); else print("Opening "+a+"…"); break;
+      case "calc": openApp("calc"); break;
+      case "notepad": openApp("notepad"); break;
+      case "exit": closeWin("terminal"); break;
+      case "color": print("(color changed)"); break;
+      default: printHtml(`'${esc(c)}' is not recognized as an internal or external command,<br>operable program or batch file.`);
+    }
+  }
+  function dirListing(){
+    const now=new Date().toLocaleDateString();
+    const rows=[["Desktop","<DIR>"],["Documents","<DIR>"],["Downloads","<DIR>"],["Pictures","<DIR>"],["notes.txt","1,204"],["resume.docx","28,672"]];
+    let out=` Directory of ${cwd}<br><br>`;
+    rows.forEach(([n,s])=>{ out+=`${now}&nbsp;&nbsp;09:14 AM&nbsp;&nbsp;&nbsp;${s.padStart? s.padStart(9):s}&nbsp;&nbsp;${n}<br>`; });
+    return out;
+  }
+  prompt();
+}
+
+/* ============================ VIRTUAL FILESYSTEM (persistent) ============================ */
+const FS_KEY="wc_fs", RC_KEY="wc_recycle", INF_KEY="wc_infect";
+function defaultFS(){ return {
+  "C:":{folder:true,children:{
+    "Users":{folder:true,children:{
+      "User":{folder:true,children:{
+        "Desktop":{folder:true,children:{
+          "WinClone.lnk":{icon:"🪟"},
+          "notes.txt":{icon:"📄",content:"my secret plans:\n- build a pc\n- do NOT delete systemwinclone.sys\n- take over the world (later)"}}},
+        "Documents":{folder:true,children:{
+          "resume.docx":{icon:"📘",content:"USER — RESUME\n\nSkills: building an operating system out of one HTML file."},
+          "budget.xlsx":{icon:"📗"},
+          "Projects":{folder:true,children:{"ideas.txt":{icon:"📄",content:"idea 1: winclone\nidea 2: winclone 2"}}}}},
+        "Downloads":{folder:true,children:{
+          "setup.exe":{icon:"⚙️",exe:true},
+          "photo.png":{icon:"🖼️",art:{g:"linear-gradient(160deg,#88b6d0,#5a7b9c 55%,#324b66)",e:"🏔️"}},
+          "movie.mp4":{icon:"🎬"}}},
+        "Pictures":{folder:true,children:{
+          "vacation.jpg":{icon:"🖼️",art:{g:"linear-gradient(160deg,#ffd194,#ff8a5c 55%,#4a90d9)",e:"🏖️"}},
+          "screenshot.png":{icon:"🖼️",art:{g:"linear-gradient(160deg,#0a1c3a,#0c2f5c 60%,#050b16)",e:"🪟"}}}},
+        "Music":{folder:true,children:{"song.mp3":{icon:"🎵"}}},
+        "Videos":{folder:true,children:{}},
+      }}
+    }},
+    "Windows":{folder:true,children:{
+      "System":{folder:true,children:{
+        "systemwinclone.sys":{icon:"⚙️",sys:true,critical:true},
+        "SysWIW48.dll":{icon:"🧩",sys:true},
+        "winclone_kernel.dll":{icon:"🧩",sys:true},
+        "wclogon.exe":{icon:"🔐",sys:true,exe:true},
+        "bootmgr.wc":{icon:"🥾",sys:true},
+      }},
+      "Fonts":{folder:true,children:{"segoe_clone.ttf":{icon:"🔤"}}},
+    }},
+    "Program Files":{folder:true,children:{
+      "Cork Defender":{folder:true,children:{"corkdefender.exe":{icon:"🛡️",exe:true,app:"defender"}}},
+      "WinClone Edge":{folder:true,children:{"edge.exe":{icon:"🌐",exe:true,app:"edge"}}},
+    }},
+  }}
+};}
+let VFS, RECYCLE, INFECTIONS;
+function loadState(){
+  try{ VFS=JSON.parse(localStorage.getItem(FS_KEY)) || defaultFS(); }catch(e){ VFS=defaultFS(); }
+  try{ RECYCLE=JSON.parse(localStorage.getItem(RC_KEY)) || []; }catch(e){ RECYCLE=[]; }
+  try{ INFECTIONS=JSON.parse(localStorage.getItem(INF_KEY)) || []; }catch(e){ INFECTIONS=[]; }
+}
+function saveFS(){ try{ localStorage.setItem(FS_KEY, JSON.stringify(VFS)); }catch(e){ try{ winDialog({icon:"⚠️",title:"Storage full",msg:"WinClone's storage is full (the browser's localStorage limit). Delete some imported images or large files to free space."}); }catch(_){} } }
+function saveRecycle(){ localStorage.setItem(RC_KEY, JSON.stringify(RECYCLE)); }
+function saveInfections(){ localStorage.setItem(INF_KEY, JSON.stringify(INFECTIONS)); }
+loadState();
+/* normalize legacy infection format (strings) -> {name,kind} */
+INFECTIONS=(INFECTIONS||[]).map(x=>typeof x==="string"?{name:x,kind:"scareware"}:x).filter(x=>x&&x.kind);
+
+const HOME_PATH=["C:","Users","User"];
+function nodeAt(path){ let n={folder:true,children:VFS}; for(const k of path){ if(!n.children||!n.children[k]) return null; n=n.children[k]; } return n; }
+
+/* open explorer windows re-render when the FS changes */
+const fxRefreshers=[];
+function refreshFX(){ fxRefreshers.forEach(f=>{try{f()}catch(e){}}); try{renderDesktopIcons();}catch(e){} }
+
+/* ---- New-file templates ---- */
+const NEW_TYPES=[
+  {label:"Folder",              icon:"📁", base:"New folder",                 make:()=>({folder:true,children:{}})},
+  {label:"Text Document",       icon:"📄", base:"New Text Document.txt",      make:()=>({icon:"📄",content:""})},
+  {label:"HTML Document",       icon:"🌐", base:"New HTML Document.html",     make:()=>({icon:"🌐",content:"<!doctype html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>New Page</title>\n  <style>body{font-family:Segoe UI,sans-serif;padding:30px;color:#222}h1{color:#0067c0}</style>\n</head>\n<body>\n  <h1>Hello from WinClone</h1>\n  <p>Edit me in Notepad, then double-click to render.</p>\n</body>\n</html>"})},
+  {label:"Rich Text Document",  icon:"📃", base:"New Rich Text Document.rtf", make:()=>({icon:"📃",content:""})},
+  {label:"Spreadsheet (CSV)",   icon:"📊", base:"New Spreadsheet.csv",        make:()=>({icon:"📊",content:"name,value\n,"})},
+  {label:"Config (INI)",        icon:"🧾", base:"New Config.ini",             make:()=>({icon:"🧾",content:"[settings]\n"})},
+  {label:"Bitmap Image",        icon:"🖼️", base:"New Bitmap Image.bmp",       make:()=>({icon:"🖼️"})},
+  {label:"ZIP Archive",         icon:"🗜️", base:"New Archive.zip",            make:()=>({icon:"🗜️",archive:true,children:{}})},
+  {label:"RAR Archive",         icon:"🗜️", base:"New Archive.rar",            make:()=>({icon:"🗜️",archive:true,children:{}})},
+];
+function uniqueName(node,base){
+  if(!node.children[base]) return base;
+  const dot=base.lastIndexOf("."), stem=dot>0?base.slice(0,dot):base, ext=dot>0?base.slice(dot):"";
+  let i=2; while(node.children[stem+" ("+i+")"+ext]) i++;
+  return stem+" ("+i+")"+ext;
+}
+function createIn(path,type){
+  const node=nodeAt(path); if(!node||!node.children) return;
+  node.children[uniqueName(node,type.base)]=type.make();
+  saveFS(); refreshFX();
+}
+function newMenu(x,y,path){
+  showCtx(x,y, NEW_TYPES.map(t=>({icon:t.icon,label:t.label,action:()=>createIn(path,t)})));
+}
+
+/* ---- clipboard ---- */
+let CLIP=null; // {mode, name, item, from}
+function clipCopy(path,name,item){ CLIP={mode:"copy",name,item:JSON.parse(JSON.stringify(item)),from:[...path]}; }
+function clipCut(path,name,item){ CLIP={mode:"cut",name,item,from:[...path]}; }
+function clipPaste(path){
+  if(!CLIP) return;
+  const node=nodeAt(path); if(!node||!node.children) return;
+  const name=uniqueName(node,CLIP.name);
+  node.children[name]=CLIP.mode==="copy"?JSON.parse(JSON.stringify(CLIP.item)):CLIP.item;
+  if(CLIP.mode==="cut"){ const src=nodeAt(CLIP.from); if(src&&src.children) delete src.children[CLIP.name]; CLIP=null; }
+  saveFS(); refreshFX();
+}
+/* ---- drag & drop move ---- */
+let DRAG=null; // {path, name, item}
+function moveItem(fromPath,name,toPath){
+  if(!DRAG&&!name) return;
+  if(fromPath.join("/")===toPath.join("/")) return; // same folder, no-op
+  const src=nodeAt(fromPath); if(!src||!src.children||!src.children[name]) return;
+  const item=src.children[name];
+  const srcFull=[...fromPath,name].join("/"), toStr=toPath.join("/");
+  if((item.folder||item.archive) && (toStr===srcFull || toStr.startsWith(srcFull+"/"))) return; // into itself
+  const dest=nodeAt(toPath); if(!dest||!dest.children) return;
+  dest.children[uniqueName(dest,name)]=item;
+  delete src.children[name];
+  saveFS(); refreshFX();
+}
+function makeDragSource(el2,path,name,item){
+  el2.draggable=true;
+  el2.addEventListener("dragstart",e=>{ DRAG={path:[...path],name,item}; e.dataTransfer.effectAllowed="move"; try{e.dataTransfer.setData("text/plain",name);}catch(_){} el2.classList.add("dragging"); });
+  el2.addEventListener("dragend",()=>{ DRAG=null; el2.classList.remove("dragging"); document.querySelectorAll(".drop-hover,.recycle-hot,.drop-target").forEach(x=>x.classList.remove("drop-hover","recycle-hot","drop-target")); });
+}
+function makeDropTarget(el2,getToPath,hoverClass){
+  el2.addEventListener("dragover",e=>{ if(!DRAG) return; const to=getToPath(); if(!to) return; if(DRAG.path.join("/")===to.join("/")&&!to.includes(DRAG.name)){} e.preventDefault(); el2.classList.add(hoverClass||"drop-hover"); });
+  el2.addEventListener("dragleave",()=>el2.classList.remove(hoverClass||"drop-hover"));
+  el2.addEventListener("drop",e=>{ if(!DRAG) return; e.preventDefault(); e.stopPropagation(); el2.classList.remove(hoverClass||"drop-hover"); const to=getToPath(); if(to) moveItem(DRAG.path,DRAG.name,to); });
+}
+function compressToArchive(path,name,item){
+  const node=nodeAt(path); if(!node||!node.children) return;
+  const stem=name.replace(/\.[^.]+$/,"");
+  const arcName=uniqueName(node,stem+".zip");
+  node.children[arcName]={icon:"🗜️",archive:true,children:{[name]:JSON.parse(JSON.stringify(item))}};
+  saveFS(); refreshFX();
+  malInfo("🗜️","Compressed",name+" → "+arcName);
+}
+function malInfo(icon,title,msg){ try{ malToast(icon,title,msg); }catch(e){} }
+
+/* ---- small input dialog (rename / save-as name) ---- */
+function inputDialog(o){
+  const d=el("div","dlg"); d.style.width="360px";
+  d.innerHTML=`<div class="dlg-head"><span>${o.title||"Rename"}</span><button class="x">✕</button></div>
+    <div style="padding:16px 16px 6px"><input class="fdlg-name" spellcheck="false"></div>
+    <div class="dlg-foot"><button class="dlg-btn pri" data-ok>${o.ok||"OK"}</button><button class="dlg-btn" data-cancel>Cancel</button></div>`;
+  document.body.appendChild(d);
+  d.style.left=Math.max(10,(innerWidth-360)/2)+"px"; d.style.top=Math.max(10,(innerHeight-160)/2)+"px";
+  d.style.zIndex=60000+(++state.z);
+  const inp=d.querySelector("input"); inp.value=o.value||"";
+  setTimeout(()=>{ inp.focus(); const dot=inp.value.lastIndexOf("."); inp.setSelectionRange(0, dot>0?dot:inp.value.length); },30);
+  const done=()=>{ const v=inp.value.trim(); d.remove(); if(v&&o.cb) o.cb(v); };
+  d.querySelector("[data-ok]").onclick=done;
+  d.querySelector("[data-cancel]").onclick=()=>d.remove();
+  d.querySelector(".x").onclick=()=>d.remove();
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter") done(); if(e.key==="Escape") d.remove(); });
+}
+function renameItem(path,name,item){
+  inputDialog({title:"Rename",value:name,ok:"Rename",cb:nv=>{
+    if(nv===name) return;
+    if(/^(__proto__|prototype|constructor)$/.test(nv)){ winDialog({icon:"⚠️",title:"Rename",msg:"That name is reserved by the system."}); return; }
+    const node=nodeAt(path); if(!node||!node.children) return;
+    if(node.children[nv]){ winDialog({icon:"⚠️",title:"Rename",msg:"An item named <b>"+esc(nv)+"</b> already exists here."}); return; }
+    node.children[nv]=item; delete node.children[name];
+    saveFS(); refreshFX();
+  }});
+}
+
+/* ---- universal open router ---- */
+function fsOpen(path,name,item){
+  if(item.locked){ winDialog({icon:"🔒",title:name,msg:"This file is encrypted by BitCork ransomware and can't be opened. Run <b>Cork Defender</b> to decrypt it."}); return; }
+  if(item.archive){ openArchive({path:[...path],name}); return; }
+  if(item.folder){ openExplorerAt([...path,name]); return; }
+  const lo=name.toLowerCase();
+  if(/\.html?$/.test(lo)) openHtml({path:[...path],name});
+  else if(/\.(png|jpe?g|gif|bmp)$/.test(lo)) openImageInPhotos({path:[...path],name});
+  else if(/\.(mp4|mp3|wav|mkv|avi)$/.test(lo)) openMediaIn({path:[...path],name});
+  else if(item.exe||item.malware||lo.endsWith(".exe")) runFile(name,item);
+  else openFileInNotepad({path:[...path],name}); // txt, rtf, csv, ini, log, unknown-with-content
+}
+/* context menu for a file/folder, reused by Explorer + Desktop */
+function fsItemMenu(x,y,path,name,item,extra){
+  const items=[{icon:"📂",label:"Open",action:()=>fsOpen(path,name,item)}];
+  if(/\.(png|jpe?g|gif|bmp)$/i.test(name) && !item.locked)
+    items.push({icon:"🖼️",label:"Set as wallpaper",action:()=>setWallpaper(artFor(name,item).g)});
+  if(item.archive) items.push({icon:"📦",label:"Extract all here",action:()=>extractArchive(path,name,item)});
+  items.push("sep",
+    {icon:"✂️",label:"Cut",action:()=>clipCut(path,name,item)},
+    {icon:"📋",label:"Copy",action:()=>clipCopy(path,name,item)},
+    {icon:"✏️",label:"Rename",action:()=>renameItem(path,name,item)});
+  if(!item.folder && !item.archive && !item.sys)
+    items.push({icon:"🗜️",label:"Compress to ZIP",action:()=>compressToArchive(path,name,item)});
+  items.push("sep",{icon:"🗑️",label:"Delete",action:()=>(extra&&extra.del?extra.del():deleteAt(path,name))});
+  showCtx(x,y,items);
+}
+function extractArchive(path,name,item){
+  const node=nodeAt(path); if(!node||!node.children||!item.children) return;
+  Object.keys(item.children).forEach(k=>{ node.children[uniqueName(node,k)]=JSON.parse(JSON.stringify(item.children[k])); });
+  saveFS(); refreshFX();
+  malInfo("📦","Extracted",name+" → "+path[path.length-1]);
+}
+
+/* ---- windowed openers that reuse an existing window ---- */
+let EXP_PENDING=null; const EXP={goto:null};
+function openExplorerAt(p){
+  if(state.wins.explorer && EXP.goto){ if(state.wins.explorer.min) toggleMin("explorer",false); focusWin("explorer"); EXP.goto(p); }
+  else { EXP_PENDING=[...p]; openApp("explorer"); }
+}
+let ARC_PENDING=null; const ARC={loader:null};
+function openArchive(pn){
+  if(state.wins.archive && ARC.loader){ if(state.wins.archive.min) toggleMin("archive",false); focusWin("archive"); ARC.loader(pn); }
+  else { ARC_PENDING=pn; openApp("archive"); }
+}
+let HV_PENDING=null; const HV={loader:null};
+function openHtml(pn){
+  if(state.wins.htmlview && HV.loader){ if(state.wins.htmlview.min) toggleMin("htmlview",false); focusWin("htmlview"); HV.loader(pn); }
+  else { HV_PENDING=pn; openApp("htmlview"); }
+}
+
+function deleteAt(path,name){
+  const parent=nodeAt(path); if(!parent||!parent.children[name]) return;
+  RECYCLE.push({name, path, item:parent.children[name], when:Date.now()});
+  delete parent.children[name];
+  saveFS(); saveRecycle(); refreshFX(); applySystemHealth();
+}
+function restoreFromRecycle(idx){
+  const r=RECYCLE[idx]; if(!r) return;
+  const parent=nodeAt(r.path);
+  if(parent&&parent.children) parent.children[r.name]=r.item;
+  RECYCLE.splice(idx,1);
+  saveFS(); saveRecycle(); refreshFX(); applySystemHealth();
+}
+
+/* ============================ DIALOG ENGINE ============================ */
+function winDialog(o){
+  const d=el("div","dlg"+(o.ad?" ad":""));
+  d.innerHTML=`<div class="dlg-head"><span>${esc(o.title||"WinClone")}</span><button class="x">✕</button></div>
+    <div class="dlg-body"><span class="big">${o.icon||"ℹ️"}</span><div>${o.msg||""}</div></div>
+    <div class="dlg-foot"></div>`;
+  const foot=d.querySelector(".dlg-foot");
+  (o.buttons||[{label:"OK",primary:true}]).forEach(b=>{
+    const btn=el("button","dlg-btn"+(b.primary?" pri":""),b.label);
+    btn.onclick=()=>{ d.remove(); if(b.action)b.action(); };
+    foot.appendChild(btn);
+  });
+  d.querySelector(".x").onclick=()=>d.remove();
+  document.body.appendChild(d);
+  const W=d.offsetWidth,H=d.offsetHeight;
+  d.style.left=(o.x!=null?Math.min(o.x,innerWidth-W-10):Math.max(10,(innerWidth-W)/2+(Math.random()*60-30)))+"px";
+  d.style.top =(o.y!=null?Math.min(o.y,innerHeight-H-10):Math.max(10,(innerHeight-H)/2+(Math.random()*40-20)))+"px";
+  d.style.zIndex=60000+(++state.z);
+  return d;
+}
+
+/* ============================ SYSTEM HEALTH / BSOD ============================ */
+let glitchTimer=null, bsodTimer=null;
+function systemStatus(){
+  const sys=nodeAt(["C:","Windows","System"]);
+  if(!sys) return {missing:["C:\\Windows\\System"], damaged:true, critical:true};
+  const missing=[];
+  ["systemwinclone.sys","SysWIW48.dll","winclone_kernel.dll","wclogon.exe","bootmgr.wc"]
+    .forEach(f=>{ if(!sys.children[f]) missing.push(f); });
+  return {missing, damaged:missing.length>0, critical:missing.includes("systemwinclone.sys")};
+}
+function applySystemHealth(){
+  const st=systemStatus();
+  document.body.classList.toggle("glitch", st.damaged);
+  clearInterval(glitchTimer); glitchTimer=null;
+  clearTimeout(bsodTimer); bsodTimer=null;
+  if(st.damaged){
+    glitchTimer=setInterval(()=>{
+      if(!$("#login").classList.contains("hide")) return;
+      const f=st.missing[Math.floor(Math.random()*st.missing.length)];
+      winDialog({icon:"❌",title:"WinClone — System Error",
+        msg:`<b>${f}</b> was not found.<br>A required system component is missing and WinClone is unstable.<br><small style="color:#9a9a9a">Restore it from the Recycle Bin, or factory-reset from the BIOS (sign-in screen).</small>`});
+    }, 25000);
+  }
+  if(st.critical && $("#login").classList.contains("hide")){
+    bsodTimer=setTimeout(()=>triggerBSOD("SYSTEM_FILE_MISSING","systemwinclone.sys"), 45000+Math.random()*20000);
+  }
+}
+function triggerBSOD(code,what){
+  closeFlyouts(); $("#ctx").style.display="none"; stopAllEffectsUI();
+  document.querySelectorAll(".dlg").forEach(d=>d.remove());
+  const b=$("#bsod"); b.style.display="flex";
+  $("#bsod-code").textContent=code; $("#bsod-what").textContent=what;
+  let p=0; $("#bsod-pct").textContent="0";
+  const iv=setInterval(()=>{
+    p+=Math.floor(Math.random()*14)+3;
+    if(p>=100){ p=100; clearInterval(iv);
+      setTimeout(()=>{
+        b.style.display="none";
+        Object.keys(state.wins).forEach(closeWin);
+        $("#login").classList.remove("hide"); $("#lg-pass").value="";
+        if(systemStatus().critical) bootRecovery();
+        else applySystemHealth();
+      },1300);
+    }
+    $("#bsod-pct").textContent=p;
+  },420);
+}
+
+/* ============================ MALWARE FX (all simulated / cosmetic) ============================ */
+/* EDUCATIONAL SIMULATION ONLY — none of this is real malware. Every "infection" is a
+   harmless visual effect confined to this HTML page and fully reversible via Cork Defender
+   or a recovery/BIOS reset. No files leave the sandbox; nothing touches the real machine. */
+const MALWARE={
+  scareware:{family:"Adware",    name:"Adware.Scareware", reveal:"📢", onMsg:"You installed adware. Enjoy the endless popups. Cork Defender can remove it."},
+  trojan:   {family:"Trojan",    name:"Trojan.Horse",     reveal:"🐴", onMsg:"Looked legit — wasn't. This Trojan is now quietly dropping <b>more</b> malware in the background…"},
+  ransomware:{family:"Ransom",   name:"Ransom.BitCork",   reveal:"🔒", onMsg:"Your files are being <b>encrypted</b>. Should've read the reviews. Cork Defender can decrypt them for free."},
+  backdoor: {family:"Backdoor",  name:"Backdoor.RAT",     reveal:"🚪", onMsg:"A <b>backdoor</b> is open. Someone just connected to your PC remotely — watch the shell (bottom-left)."},
+  worm:     {family:"Worm",      name:"Worm.Replika",     reveal:"🪱", onMsg:"A <b>worm</b> is loose — it's copying itself across your folders and won't stop on its own."},
+  miner:    {family:"CoinMiner", name:"CoinMiner.BitCork",reveal:"⛏️", onMsg:"A <b>crypto miner</b> is now pegging your CPU to mine ₿Cork for someone else (top-right)."},
+  keylogger:{family:"Spyware",   name:"Spyware.Keylog",   reveal:"⌨️", onMsg:"A <b>keylogger</b> is recording everything you type. Watch the bar at the bottom of the screen."},
+  spyware:  {family:"Spyware",   name:"Spyware.PeepCam",  reveal:"👁️", onMsg:"<b>Spyware</b> just switched on your camera and mic. Say cheese."},
+};
+const ADS=[
+  {icon:"🎉",title:"CONGRATULATIONS!!!",msg:"You are the <b>1,000,000th</b> WinClone user! Click OK to claim your free cruise 🚢"},
+  {icon:"🧠",title:"RAM Doubler PRO",msg:"Optimizing your RAM… <b>384% complete.</b> Do not turn off your computer."},
+  {icon:"🔥",title:"HOT DEAL",msg:"Local singles in your Recycle Bin want to meet YOU."},
+  {icon:"🦠",title:"Totally Real Antivirus",msg:"We found <b>1,432 viruses!</b> Send $500 in gift cards to remove them."},
+  {icon:"🐮",title:"FREE COW CLICKER",msg:"Your cow is HUNGRY. Click now or it will be sad forever."},
+  {icon:"📉",title:"FPS Booster 9000",msg:"Your FPS has been boosted to <b>-3</b>. You're welcome."},
+];
+const RANSOM_NOTE=`!!! YOUR FILES HAVE BEEN ENCRYPTED !!!\n\nAll your documents, pictures and downloads are now locked with Cork-256 encryption.\nTo recover them, send 0.5 BitCork to the address in the ransom window.\n\n(This is a SIMULATION for education. Run Cork Defender to decrypt everything for free.)`;
+const rnd=n=>Math.floor(Math.random()*n);
+const loggedIn=()=>$("#login").classList.contains("hide") && $("#recovery").style.display!=="flex" && $("#bsod").style.display!=="flex";
+function infected(){ return INFECTIONS.length>0; }
+function hasKind(k){ return INFECTIONS.some(i=>i.kind===k); }
+
+/* ---- scareware popups ---- */
+let adTimer=null;
+function spawnAd(){
+  if(!hasKind("scareware") || !loggedIn()) return;
+  const a=ADS[rnd(ADS.length)];
+  const again=()=>{ if(Math.random()<0.4) setTimeout(spawnAd,400); };
+  winDialog({icon:a.icon,title:a.title,msg:a.msg,ad:true,
+    x:40+Math.random()*Math.max(100,innerWidth-520),
+    y:40+Math.random()*Math.max(80,innerHeight-340),
+    buttons:[{label:"OK",primary:true,action:again},{label:"No thanks",action:again}]});
+  if(Math.random()<0.35){ document.body.classList.add("flashinv"); setTimeout(()=>document.body.classList.remove("flashinv"),160); }
+}
+
+/* ---- toast helper ---- */
+function malToast(icon,title,msg){
+  const t=el("div","mal-toast",`<b>${icon} ${esc(title)}</b><br><span style="color:#bbb">${esc(msg)}</span>`);
+  const n=document.querySelectorAll(".mal-toast").length;
+  t.style.bottom=(60+n*70)+"px";
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.style.transition="opacity .3s"; t.style.opacity="0"; setTimeout(()=>t.remove(),320); },3400);
+}
+
+/* ---- backdoor / RAT ---- */
+let bdTimer=null;
+function startBackdoor(){
+  if(!$("#backdoor-w")){
+    const w=el("div","mal-widget"); w.id="backdoor-w";
+    w.innerHTML=`<div class="bd-head">● remote shell — 45.13.${rnd(255)}.${rnd(255)} connected</div><div class="bd-log"></div>`;
+    document.body.appendChild(w);
+  }
+  const log=$("#backdoor-w").querySelector(".bd-log");
+  const lines=["root@winclone:~# whoami","user (administrator)",
+    "root@winclone:~# ls ~/Documents","resume.docx  budget.xlsx  Projects/",
+    "root@winclone:~# cat ~/Documents/passwords.txt","exfiltrating 4.2 KB … done",
+    "root@winclone:~# enable persistence","installed to startup ✓",
+    "root@winclone:~# webcam --snap","uploaded selfie.jpg → 45.13.x.x",
+    "root@winclone:~# echo 'thanks for the files :)'","thanks for the files :)"];
+  let i=0;
+  clearTimeout(bdTimer);
+  (function type(){
+    if(!$("#backdoor-w")) return;
+    log.querySelectorAll(".bd-cursor").forEach(c=>c.remove());
+    const d=el("div"); d.innerHTML=lines[i%lines.length]+' <span class="bd-cursor"></span>';
+    log.appendChild(d);
+    while(log.children.length>7) log.removeChild(log.firstChild);
+    i++; bdTimer=setTimeout(type, 1000+Math.random()*900);
+  })();
+}
+function stopBackdoor(){ clearTimeout(bdTimer); bdTimer=null; const w=$("#backdoor-w"); if(w) w.remove(); }
+
+/* ---- crypto miner ---- */
+let minerTimer=null;
+function startMiner(){
+  if(!$("#miner-w")){
+    const w=el("div","mal-widget"); w.id="miner-w";
+    w.innerHTML=`<div><b>⛏️ BitCork Miner</b> — mining</div>
+      <div class="cpu">CPU <span data-cpu>100</span>% &nbsp; 🌡️ <span data-temp>93</span>°C</div>
+      <div class="bar"><i></i></div>
+      <div class="mh">Hashrate <span data-hr>0.0</span> MH/s</div>
+      <div style="color:#7cff6b">Earned ₿ <span data-earn>0.00000</span> <small style="color:#666">(for someone else)</small></div>`;
+    document.body.appendChild(w);
+  }
+  $("#heat").style.display="block"; document.body.classList.add("laggy");
+  clearInterval(minerTimer); let earn=0;
+  minerTimer=setInterval(()=>{
+    const w=$("#miner-w"); if(!w) return;
+    earn+=0.00001+Math.random()*0.00002;
+    w.querySelector("[data-hr]").textContent=(27+Math.random()*10).toFixed(1);
+    w.querySelector("[data-cpu]").textContent=(97+rnd(4));
+    w.querySelector("[data-temp]").textContent=(90+rnd(8));
+    w.querySelector("[data-earn]").textContent=earn.toFixed(5);
+  },700);
+}
+function stopMiner(){ clearInterval(minerTimer); minerTimer=null; const w=$("#miner-w"); if(w) w.remove(); $("#heat").style.display="none"; document.body.classList.remove("laggy"); }
+
+/* ---- keylogger ---- */
+let klBuf=[], klHandler=null;
+function startKeylogger(){
+  if(!$("#keylog-w")){
+    const w=el("div","mal-widget"); w.id="keylog-w";
+    w.innerHTML=`<b>⌨ keylogger</b> ▸ <span data-keys>listening…</span>`;
+    document.body.appendChild(w);
+  }
+  if(!klHandler){
+    klHandler=e=>{
+      const box=$("#keylog-w"); if(!box) return;
+      let k=e.key;
+      if(k===" ") k="␣"; else if(k==="Enter") k="⏎"; else if(k==="Backspace") k="⌫"; else if(k.length>1) return;
+      klBuf.push(k); if(klBuf.length>44) klBuf.shift();
+      const s=box.querySelector("[data-keys]"); if(s) s.textContent=klBuf.join(" ");
+    };
+    document.addEventListener("keydown", klHandler, true);
+  }
+}
+function stopKeylogger(){ if(klHandler){ document.removeEventListener("keydown",klHandler,true); klHandler=null; } klBuf=[]; const w=$("#keylog-w"); if(w) w.remove(); }
+
+/* ---- spyware / webcam ---- */
+let spyTimer=null;
+function startSpyware(){
+  if(!$("#spy-w")){
+    const w=el("div"); w.id="spy-w";
+    w.innerHTML=`<span class="dot"></span> 🔴 REC — camera &amp; microphone active`;
+    document.body.appendChild(w);
+  }
+  clearInterval(spyTimer);
+  spyTimer=setInterval(()=>{ if(loggedIn() && Math.random()<0.5) malToast("📸","Spyware","Snapshot uploaded to unknown server ("+(rnd(900)+120)+" KB)"); },16000);
+}
+function stopSpyware(){ clearInterval(spyTimer); spyTimer=null; const w=$("#spy-w"); if(w) w.remove(); }
+
+/* ---- worm (self-replication) ---- */
+let wormTimer=null;
+function wormCount(){ let c=0; (function w(n){const k=n.children||{};Object.keys(k).forEach(x=>{if(x.startsWith("wcworm_"))c++;if(k[x].folder)w(k[x]);});})({children:VFS}); return c; }
+function wormSpread(){
+  if(!loggedIn() || !hasKind("worm")) return;
+  if(wormCount()>=28) return;
+  const folders=[[...HOME_PATH,"Documents"],[...HOME_PATH,"Downloads"],[...HOME_PATH,"Desktop"],[...HOME_PATH,"Pictures"],["C:","Windows","System"]];
+  const p=folders[rnd(folders.length)], node=nodeAt(p);
+  if(!node||!node.children) return;
+  const nm="wcworm_"+String(Date.now()).slice(-5)+".exe";
+  node.children[nm]={icon:"🪱",exe:true,malware:true,kind:"worm",runMsg:"the worm wriggles menacingly."};
+  saveFS(); refreshFX();
+  if(Math.random()<0.4) malToast("🪱","Worm","Replicated to "+p.join("\\"));
+}
+
+/* ---- ransomware ---- */
+function ransomTargets(){ return [[...HOME_PATH,"Documents"],[...HOME_PATH,"Desktop"],[...HOME_PATH,"Pictures"],[...HOME_PATH,"Downloads"]]; }
+function encryptFiles(){
+  ransomTargets().forEach(p=>{
+    const n=nodeAt(p); if(!n||!n.children) return;
+    Object.keys(n.children).forEach(name=>{
+      const it=n.children[name];
+      if(it.folder||it.locked||it.malware||name.endsWith(".wcrypt")) return;
+      it.origName=name; it.origIcon=it.icon||"📄"; it.locked=true; it.icon="🔒";
+      n.children[name+".wcrypt"]=it; delete n.children[name];
+    });
+  });
+  const dt=nodeAt([...HOME_PATH,"Desktop"]);
+  if(dt&&dt.children) dt.children["READ_ME_TO_DECRYPT.txt"]={icon:"⚠️",content:RANSOM_NOTE,ransomNote:true};
+  saveFS(); refreshFX();
+}
+function decryptFiles(){
+  (function walk(node){
+    const kids=node.children||{};
+    Object.keys(kids).forEach(k=>{
+      const it=kids[k];
+      if(it.folder){ walk(it); return; }
+      if(it.ransomNote){ delete kids[k]; return; }
+      if(it.locked){
+        const orig=it.origName||k.replace(/\.wcrypt$/,"");
+        it.icon=it.origIcon||"📄"; delete it.locked; delete it.origName; delete it.origIcon;
+        delete kids[k]; kids[orig]=it;
+      }
+    });
+  })({children:VFS});
+  saveFS(); refreshFX();
+}
+let ransomCd=null;
+function showRansom(){
+  const R=$("#ransom");
+  if(R.style.display==="flex") return;
+  R.style.display="flex";
+  R.innerHTML=`<div class="skull">💀</div>
+    <h1>Your files have been encrypted</h1>
+    <div class="rmsg">All your documents, photos and downloads have been locked with <b>Cork-256</b> encryption by <b>BitCork Ransomware</b>. Pay the ransom before the timer hits zero or your files are gone forever.*
+      <br><small>*This is a simulation. Cork Defender can decrypt everything for free — nothing was actually harmed.</small></div>
+    <div class="rbox">
+      <div>Time left until your files are destroyed:</div>
+      <div class="rtimer" data-timer>71:59:59</div>
+      <div>Send exactly <b>0.5 ₿Cork</b> to:</div>
+      <div class="raddr">bc1q-w1nclone-f4ke-addr-n0t-real-c0rk-x9z2</div>
+    </div>
+    <div class="rbtns">
+      <button class="rbtn pay" data-pay>I paid — decrypt my files</button>
+      <button class="rbtn dec" data-def>🛡️ Decrypt with Cork Defender</button>
+      <button class="rbtn x" data-x>Hide for now ✕</button>
+    </div>`;
+  let t=72*3600-1;
+  clearInterval(ransomCd);
+  ransomCd=setInterval(()=>{
+    const e2=R.querySelector("[data-timer]"); if(!e2){ clearInterval(ransomCd); return; }
+    t=Math.max(0,t-1);
+    e2.textContent=`${String(Math.floor(t/3600)).padStart(2,"0")}:${String(Math.floor(t%3600/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`;
+  },1000);
+  R.querySelector("[data-pay]").onclick=()=>winDialog({icon:"💸",title:"Payment",msg:"Transaction failed: you have 0 ₿Cork — and even if you paid, real ransomware operators usually don't give your files back. That's the whole lesson. Use Cork Defender instead."});
+  R.querySelector("[data-def]").onclick=()=>{ hideRansom(true); openApp("defender"); };
+  R.querySelector("[data-x]").onclick=()=>hideRansom(true);
+}
+function hideRansom(temp){
+  const R=$("#ransom"); R.style.display="none"; clearInterval(ransomCd); ransomCd=null;
+  if(temp && hasKind("ransomware")) setTimeout(()=>{ if(hasKind("ransomware")&&loggedIn()) showRansom(); },40000);
+}
+
+/* ---- master effect controller ---- */
+function refreshInfectionFX(){
+  const on=loggedIn();
+  clearInterval(adTimer); adTimer=null;
+  if(on && hasKind("scareware")){ setTimeout(spawnAd,1400); adTimer=setInterval(spawnAd,11000); }
+  (on&&hasKind("backdoor"))?startBackdoor():stopBackdoor();
+  (on&&hasKind("miner"))?startMiner():stopMiner();
+  (on&&hasKind("keylogger"))?startKeylogger():stopKeylogger();
+  (on&&hasKind("spyware"))?startSpyware():stopSpyware();
+  clearInterval(wormTimer); wormTimer=null;
+  if(on && hasKind("worm")) wormTimer=setInterval(wormSpread,9000);
+  if(on && hasKind("ransomware")) showRansom(); else if(!hasKind("ransomware")) hideRansom(false);
+}
+function stopAllEffectsUI(){
+  clearInterval(adTimer); adTimer=null;
+  stopBackdoor(); stopMiner(); stopKeylogger(); stopSpyware();
+  clearInterval(wormTimer); wormTimer=null;
+  hideRansom(false);
+  document.querySelectorAll(".dlg.ad,.mal-toast").forEach(d=>d.remove());
+}
+function infect(name,kind){
+  kind=kind||"scareware";
+  if(!INFECTIONS.some(i=>i.name===name&&i.kind===kind)) INFECTIONS.push({name,kind});
+  saveInfections();
+  if(kind==="ransomware") encryptFiles();
+  if(kind==="trojan"){
+    setTimeout(()=>{
+      if(!hasKind("trojan")) return;
+      malToast("🐴","Trojan","Payload deployed — dropping more malware…");
+      ["backdoor","miner","scareware"].forEach((d,i)=>setTimeout(()=>infect("trojan.payload."+d,d),i*1400));
+    },3500);
+  }
+  refreshInfectionFX();
+}
+function disinfect(){
+  INFECTIONS=[]; saveInfections();
+  stopAllEffectsUI();
+  (function walk(node){
+    const kids=node.children||{};
+    Object.keys(kids).forEach(k=>{ const it=kids[k];
+      if(it.folder){ walk(it); return; }
+      if(k.startsWith("wcworm_")||it.ransomNote){ delete kids[k]; }
+    });
+  })({children:VFS});
+  decryptFiles();
+}
+
+/* run an exe from the filesystem */
+function runFile(name,item){
+  if(item.app){ openApp(item.app); return; }
+  if(item.locked){ winDialog({icon:"🔒",title:name,msg:"This file is encrypted by BitCork ransomware and can't be opened. Run <b>Cork Defender</b> to decrypt it."}); return; }
+  if(item.malware){
+    const kind=item.kind||"scareware", meta=MALWARE[kind]||MALWARE.scareware;
+    winDialog({icon:"⏳",title:name,msg:"Installing "+esc(name)+"…"});
+    setTimeout(()=>{
+      infect(name,kind);
+      winDialog({icon:meta.reveal,title:name+" — "+meta.family,msg:meta.onMsg+`<br><small style="color:#9a9a9a">(Simulated ${kind}. Cork Defender or a recovery reset removes it.)</small>`});
+    },1400);
+    return;
+  }
+  if(item.runMsg){ winDialog({icon:item.icon||"⚙️",title:name,msg:item.runMsg}); return; }
+  if(item.exe){ winDialog({icon:item.icon||"⚙️",title:name,msg:name+" ran successfully. It did absolutely nothing, beautifully."}); }
+}
+
+/* ============================ IMAGES / WALLPAPER ============================ */
+function artFor(name,item){
+  if(item&&item.img) return {g:`center/cover no-repeat url('${item.img}')`, e:""};
+  if(item&&item.art) return item.art;
+  let h=0; for(const ch of name) h=(h*31+ch.charCodeAt(0))>>>0;
+  const hue=h%360, hue2=(hue+60+h%90)%360;
+  const emojis=["🌄","🌅","🏞️","🌌","🌇","🗻","🌊","🌲","🏜️","🌃"];
+  return {g:`linear-gradient(135deg,hsl(${hue},65%,52%),hsl(${hue2},70%,30%))`,e:emojis[h%emojis.length]};
+}
+function allImages(){
+  const out=[];
+  (function walk(node,path){
+    const kids=node.children||{};
+    Object.keys(kids).forEach(k=>{
+      const it=kids[k];
+      if(it.folder) walk(it,[...path,k]);
+      else if(/\.(png|jpe?g|gif|bmp)$/i.test(k)) out.push({name:k,path:[...path],item:it});
+    });
+  })({children:VFS},[]);
+  return out;
+}
+const WALLPAPERS=[
+  {n:"Aurora Night",  g:"linear-gradient(160deg,#0b1026 0%,#16305c 40%,#2b8c67 75%,#7fe3a0 100%)"},
+  {n:"Sunset Dunes",  g:"linear-gradient(160deg,#2d1b4e,#b34a67 55%,#ff9d5c)"},
+  {n:"Deep Ocean",    g:"radial-gradient(120% 120% at 50% 20%,#0b3c5d,#03151f 80%)"},
+  {n:"Cotton Candy",  g:"linear-gradient(135deg,#89f7fe,#f6a6ff)"},
+  {n:"Lava Flow",     g:"linear-gradient(150deg,#1a0000,#7a1010 55%,#ff7a18)"},
+  {n:"Hacker Green",  g:"linear-gradient(180deg,#001800,#003300 60%,#00aa44)"},
+  {n:"Winter Peak",   g:"linear-gradient(160deg,#c9dff2,#7fa8cc 50%,#40608c)"},
+  {n:"Void Purple",   g:"radial-gradient(100% 100% at 50% 30%,#3c1361,#0d0221 80%)"},
+];
+function applyWallpaper(css){
+  const d=$("#desktop");
+  d.style.background=""; d.style.backgroundImage="";
+  if(!css) return;
+  if(/url\(/.test(css)) d.style.background=css+", #05070d";  // real image (cover shorthand)
+  else d.style.backgroundImage=css;                          // gradient
+}
+function setWallpaper(css){ applyWallpaper(css); try{ localStorage.setItem("wc_wall",css); }catch(e){} }
+function clearWallpaper(){ applyWallpaper(""); localStorage.removeItem("wc_wall"); }
+
+/* ---- import real images from the user's computer ---- */
+function loadScaledDataURL(file,maxDim,cb){
+  const r=new FileReader();
+  r.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      const scale=Math.min(1, maxDim/Math.max(w,h));
+      w=Math.max(1,Math.round(w*scale)); h=Math.max(1,Math.round(h*scale));
+      const c=document.createElement("canvas"); c.width=w; c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      try{ cb(c.toDataURL("image/jpeg",0.85)); }catch(e){ cb(null); }
+    };
+    img.onerror=()=>cb(null);
+    img.src=r.result;
+  };
+  r.onerror=()=>cb(null);
+  r.readAsDataURL(file);
+}
+function importImages(targetPath,done){
+  const inp=$("#fileimport"); if(!inp) return;
+  inp.value="";
+  inp.onchange=()=>{
+    const files=[...inp.files]; if(!files.length) return;
+    let pending=files.length, added=0;
+    files.forEach(f=>{
+      loadScaledDataURL(f,1920,data=>{
+        if(data){
+          const node=nodeAt(targetPath);
+          if(node&&node.children){
+            let nm=(f.name||"image").replace(/[\\/:*?"<>|]/g,"_");
+            if(!/\.(png|jpe?g|gif|bmp|webp)$/i.test(nm)) nm+=".jpg";
+            node.children[uniqueName(node,nm)]={icon:"🖼️",img:data};
+            added++;
+          }
+        }
+        if(--pending===0){
+          saveFS(); refreshFX();
+          if(added) malInfo("🖼️","Imported",added+" image(s) added to "+targetPath[targetPath.length-1]);
+          else winDialog({icon:"⚠️",title:"Import",msg:"Couldn't import those files. Storage may be full — try smaller or fewer images."});
+          if(done) done();
+        }
+      });
+    });
+  };
+  inp.click();
+}
+function buildExplorer(body){
+  body.innerHTML=`<div class="fx">
+    <div class="fx-side">
+      <div class="grp">Quick access</div>
+      <div class="item act" data-nav="home"><span>🏠</span> Home</div>
+      <div class="item" data-nav="Desktop"><span>🖥️</span> Desktop</div>
+      <div class="item" data-nav="Downloads"><span>⬇️</span> Downloads</div>
+      <div class="item" data-nav="Documents"><span>📄</span> Documents</div>
+      <div class="item" data-nav="Pictures"><span>🖼️</span> Pictures</div>
+      <div class="grp">This PC</div>
+      <div class="item" data-nav="cdrive"><span>💽</span> Local Disk (C:)</div>
+      <div class="item" data-nav="system"><span>🧩</span> Windows › System</div>
+    </div>
+    <div class="fx-main">
+      <div class="fx-bar">
+        <button class="edge-nav" data-b="back">←</button>
+        <button class="edge-nav" data-b="up">↑</button>
+        <div class="fx-crumb">Home</div>
+      </div>
+      <div class="fx-grid"></div>
+    </div></div>`;
+  const grid=body.querySelector(".fx-grid"), crumb=body.querySelector(".fx-crumb");
+  let path = EXP_PENDING ? EXP_PENDING : [...HOME_PATH];
+  EXP_PENDING=null;
+  function render(){
+    if(!grid.isConnected) return;
+    grid.innerHTML="";
+    const node=nodeAt(path);
+    if(!node){ path=[...HOME_PATH]; }
+    crumb.textContent="This PC › "+path.join(" › ");
+    const kids=(nodeAt(path)||{}).children||{};
+    if(Object.keys(kids).length===0){ grid.innerHTML=`<div style="color:#888;padding:20px">This folder is empty. Right-click to create something.</div>`; return; }
+    Object.keys(kids).forEach(name=>{
+      const item=kids[name];
+      const glyph=item.folder?"📁":(item.archive?"🗜️":(item.icon||"📄"));
+      const t=el("div","fx-tile");
+      t.innerHTML=`<span class="gl">${glyph}</span><span class="nm">${esc(name)}</span>`;
+      t.onclick=e=>{ e.stopPropagation(); grid.querySelectorAll(".sel").forEach(x=>x.classList.remove("sel")); t.classList.add("sel"); };
+      t.ondblclick=()=>openItem(name,item);
+      t.oncontextmenu=e=>{ e.preventDefault(); e.stopPropagation();
+        fsItemMenu(e.clientX,e.clientY,[...path],name,item,{del:()=>tryDelete(name,item)});
+      };
+      makeDragSource(t,path,name,item);
+      if(item.folder) makeDropTarget(t,()=>[...path,name]);
+      grid.appendChild(t);
+    });
+  }
+  function openItem(name,item){
+    if(item.archive || !item.folder){ fsOpen([...path],name,item); return; }
+    if(item.locked){ winDialog({icon:"🔒",title:name,msg:"This file is encrypted by BitCork ransomware."}); return; }
+    path=[...path,name]; render(); // folders navigate in-window
+  }
+  EXP.goto=p=>{ path=[...p]; render(); };
+  function tryDelete(name,item){
+    const p=[...path];
+    if(item.critical){
+      winDialog({icon:"🛑",title:"Delete protected system file?",
+        msg:`<b>${esc(name)}</b> is REQUIRED for WinClone to run.<br>Deleting it <b>will destroy this installation.</b> Are you absolutely sure?`,
+        buttons:[{label:"Delete anyway",action:()=>doDelete(p,name,true)},{label:"Cancel",primary:true}]});
+    } else if(item.sys){
+      winDialog({icon:"⚠️",title:"Delete protected system file?",
+        msg:`You need permission from TrustedInstaller… just kidding, you're the admin.<br><b>${esc(name)}</b> is a system file — WinClone may become unstable.`,
+        buttons:[{label:"Delete",action:()=>doDelete(p,name,false)},{label:"Cancel",primary:true}]});
+    } else {
+      winDialog({icon:"🗑️",title:"Delete file",
+        msg:`Are you sure you want to move <b>${esc(name)}</b> to the Recycle Bin?`,
+        buttons:[{label:"Yes",primary:true,action:()=>doDelete(p,name,false)},{label:"No"}]});
+    }
+  }
+  function doDelete(p,name,critical){
+    deleteAt(p,name);
+    if(critical){
+      setTimeout(()=>winDialog({icon:"❌",title:"wclogon.exe — Application Error",msg:"The instruction at 0x00007FFA referenced memory at 0x00000000. The memory could not be read."}),900);
+      setTimeout(()=>winDialog({icon:"❌",title:"explorer.exe",msg:"A critical system process has stopped unexpectedly."}),2000);
+      setTimeout(()=>triggerBSOD("SYSTEM_FILE_MISSING","systemwinclone.sys"),3800);
+    }
+  }
+  grid.oncontextmenu=e=>{
+    if(e.target.closest(".fx-tile")) return;
+    e.preventDefault(); e.stopPropagation();
+    const menu=[{icon:"📄",label:"New", arrow:true, action:()=>newMenu(e.clientX,e.clientY,[...path])}];
+    if(CLIP) menu.push({icon:"📋",label:"Paste",action:()=>clipPaste([...path])});
+    menu.push({icon:"📥",label:"Import image from computer…",action:()=>importImages([...path])});
+    menu.push("sep",{icon:"🔄",label:"Refresh",action:render});
+    showCtx(e.clientX,e.clientY,menu);
+  };
+  const navPath=nav=> nav==="home"?[...HOME_PATH] : nav==="cdrive"?["C:"] : nav==="system"?["C:","Windows","System"] : [...HOME_PATH,nav];
+  body.querySelectorAll(".fx-side .item").forEach(it=>{
+    it.onclick=()=>{
+      body.querySelectorAll(".fx-side .item").forEach(x=>x.classList.remove("act"));
+      it.classList.add("act");
+      path=navPath(it.dataset.nav); render();
+    };
+    makeDropTarget(it,()=>navPath(it.dataset.nav));
+  });
+  // drop onto empty grid = move into the current folder
+  grid.addEventListener("dragover",e=>{ if(DRAG){ e.preventDefault(); } });
+  grid.addEventListener("drop",e=>{ if(!DRAG) return; if(e.target.closest(".fx-tile")) return; e.preventDefault(); e.stopPropagation(); moveItem(DRAG.path,DRAG.name,[...path]); });
+  body.querySelector('[data-b="up"]').onclick=()=>{ if(path.length>1){ path=path.slice(0,-1); render(); } };
+  body.querySelector('[data-b="back"]').onclick=()=>{ if(path.length>1){ path=path.slice(0,-1); render(); } };
+  fxRefreshers.push(render);
+  render();
+}
+
+function buildSettings(body){
+  const pages = {
+    system:`<h2>System</h2>
+      <div class="st-card"><div class="l"><span class="gl">🎨</span><div class="t"><b>Dark mode</b><small>Change the color scheme</small></div></div><div class="toggle ${document.getElementById('desktop').classList.contains('dark')?'on':''}" data-t="theme"></div></div>
+      <div class="st-card"><div class="l"><span class="gl">🎯</span><div class="t"><b>Accent color</b><small>Pick a highlight color</small></div></div>
+        <div class="swatches">
+          <div class="sw" style="background:#4cc2ff" data-a="#4cc2ff|#0067c0"></div>
+          <div class="sw" style="background:#5cd68a" data-a="#5cd68a|#107c41"></div>
+          <div class="sw" style="background:#ff8c42" data-a="#ff8c42|#c4501a"></div>
+          <div class="sw" style="background:#c58af9" data-a="#c58af9|#8a3ffc"></div>
+          <div class="sw" style="background:#ff6b81" data-a="#ff6b81|#c42b4a"></div>
+        </div></div>
+      <div class="st-card"><div class="l"><span class="gl">🖼️</span><div class="t"><b>Wallpaper theme</b><small>Light or dark bloom</small></div></div>
+        <div><button class="allbtn" data-w="dark" style="margin-right:6px">Dark</button><button class="allbtn" data-w="light">Light</button></div></div>`,
+    about:`<h2>About</h2>
+      <div class="st-card" style="flex-direction:column;align-items:flex-start;gap:6px">
+        <div style="font-size:15px"><b>WINCLONE-PC</b></div>
+        <div style="color:#9a9a9a;font-size:12.5px;line-height:1.9">
+          Device name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WINCLONE-PC<br>
+          Processor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WinClone Core i9 @ 3.60 GHz<br>
+          Installed RAM&nbsp;&nbsp;&nbsp;32.0 GB<br>
+          System type&nbsp;&nbsp;&nbsp;&nbsp;64-bit OS, x64-based processor<br>
+          Edition&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WinClone 12 Pro<br>
+          Version&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;24H2 &nbsp; Build 26100
+        </div>
+      </div>
+      <div class="st-card"><div class="l"><span class="gl">✅</span><div class="t"><b>Windows is activated</b><small>with a digital license</small></div></div></div>`,
+    bt:`<h2>Bluetooth & devices</h2>
+      <div class="st-card"><div class="l"><span class="gl">🖱️</span><div class="t"><b>Mouse</b><small>WinClone Precision Mouse</small></div></div><small style="color:#5cd68a">Connected</small></div>
+      <div class="st-card"><div class="l"><span class="gl">⌨️</span><div class="t"><b>Keyboard</b><small>WinClone Keys</small></div></div><small style="color:#5cd68a">Connected</small></div>
+      <div class="st-card"><div class="l"><span class="gl">🎧</span><div class="t"><b>Headphones</b><small>WinBuds Pro</small></div></div><small style="color:#9a9a9a">Not paired</small></div>`,
+    net:`<h2>Network & internet</h2>
+      <div class="st-card"><div class="l"><span class="gl">📶</span><div class="t"><b>Wi-Fi — HOME-5G</b><small>Connected, secured</small></div></div><div class="toggle on"></div></div>
+      <div class="st-card"><div class="l"><span class="gl">✈️</span><div class="t"><b>Airplane mode</b><small>Stop wireless communication</small></div></div><div class="toggle"></div></div>`,
+  };
+  body.innerHTML=`<div class="settings">
+    <div class="st-side">
+      <div class="st-user"><div class="avatar">U</div><div><b style="font-size:13px">User</b><br><small style="color:#9a9a9a;font-size:11px">user@winclone.local</small></div></div>
+      <div class="st-nav act" style="position:relative" data-p="system"><span class="gl">🖥️</span> System</div>
+      <div class="st-nav" style="position:relative" data-p="bt"><span class="gl">🔵</span> Bluetooth &amp; devices</div>
+      <div class="st-nav" style="position:relative" data-p="net"><span class="gl">🌐</span> Network &amp; internet</div>
+      <div class="st-nav" style="position:relative" data-p="about"><span class="gl">ℹ️</span> About</div>
+    </div>
+    <div class="st-main">${pages.system}</div>
+  </div>`;
+  const main=body.querySelector(".st-main");
+  function wire(){
+    main.querySelectorAll("[data-t='theme']").forEach(t=>t.onclick=()=>{ t.classList.toggle("on"); setTheme(t.classList.contains("on")); });
+    main.querySelectorAll("[data-a]").forEach(s=>s.onclick=()=>{
+      main.querySelectorAll("[data-a]").forEach(x=>x.classList.remove("sel")); s.classList.add("sel");
+      const [a,solid]=s.dataset.a.split("|"); document.documentElement.style.setProperty("--accent",a); document.documentElement.style.setProperty("--accent-solid",solid);
+    });
+    main.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>setTheme(b.dataset.w==="dark"));
+  }
+  wire();
+  body.querySelectorAll(".st-nav").forEach(n=>n.onclick=()=>{
+    body.querySelectorAll(".st-nav").forEach(x=>x.classList.remove("act")); n.classList.add("act");
+    main.innerHTML=pages[n.dataset.p]; wire();
+  });
+}
+function setTheme(dark){
+  const d=$("#desktop");
+  d.classList.toggle("dark",dark); d.classList.toggle("light",!dark);
+  clearWallpaper();
+}
+
+const STORE_APPS=[
+  {file:"PixelCrab.exe",      icon:"🦀", name:"PixelCrab Deluxe",       desc:"An adorable desktop crab. 5★ — 2.1M downloads", runMsg:"🦀 clack clack. PixelCrab says hi!"},
+  {file:"WinTunes.exe",       icon:"🎵", name:"WinTunes Music",          desc:"Play all 1 of your songs. 4★ — 800K downloads", runMsg:"🎵 Now playing: song.mp3 (in your imagination)."},
+  {file:"CoolWallpapers.exe", icon:"🖼️", name:"Cool Wallpapers HD",     desc:"Wallpapers so cool they're already on your PC. 4★", runMsg:"🖼️ Wallpaper applied! (it was the same one)"},
+  {file:"RAM_Doubler_PRO.exe",   icon:"🧠", name:"RAM Doubler PRO",       desc:"D0ubles your RAM!!! 100% legit. ⭐ — 3 downloads", malware:true, kind:"scareware"},
+  {file:"FPS_Booster9000.exe",   icon:"🚀", name:"FPS Booster 9000",      desc:"+9000 FPS instantly!! not a scam!! trust!!", malware:true, kind:"scareware"},
+  {file:"free_robux_gen.exe",    icon:"😈", name:"free_robux_generator",  desc:"FREE ROBUX working 2026 no survey no scam", malware:true, kind:"trojan"},
+  {file:"WinClone_Activator.exe",icon:"🔑", name:"WinClone Activator KMS",desc:"Activate Pro for FREE. crack by xXx_h4x", malware:true, kind:"backdoor"},
+  {file:"CryptoTab_Turbo.exe",   icon:"💰", name:"CryptoTab Turbo",       desc:"Earn $500/day mining while you sleep 💸", malware:true, kind:"miner"},
+  {file:"PhotoViewer_Pro.exe",   icon:"🖼️", name:"Photo Viewer Pro",     desc:"Nicer than the built-in viewer. Trusted★★★★", malware:true, kind:"ransomware"},
+  {file:"Minecraft_1.20_FULL.exe",icon:"🟩",name:"Minecraft FREE (full)", desc:"Full version, no login needed!! working", malware:true, kind:"worm"},
+  {file:"SystemCleaner_Pro.exe", icon:"🧹", name:"System Cleaner Pro",    desc:"Speed up your PC by 300%! free download", malware:true, kind:"spyware"},
+];
+function buildEdge(body){
+  body.innerHTML=`<div class="edge">
+    <div class="edge-bar">
+      <button class="edge-nav" data-h>←</button><button class="edge-nav">→</button><button class="edge-nav" data-r>⟳</button>
+      <input class="edge-url" value="https://www.bing.com">
+    </div>
+    <div class="edge-page"></div></div>`;
+  const page=body.querySelector(".edge-page"), url=body.querySelector(".edge-url");
+  function home(){
+    url.value="https://www.bing.com";
+    page.style.alignItems="center"; page.style.paddingTop="70px";
+    page.innerHTML=`
+      <div class="logo">WinSearch</div>
+      <input class="edge-search" placeholder="Search the web">
+      <div class="edge-links">
+        <a data-store><span class="gl">⬇️</span>App Store</a>
+        <a data-wp><span class="gl">🖼️</span>Wallpapers</a>
+        <a data-open="edge"><span class="gl">📰</span>News</a>
+        <a data-open="edge"><span class="gl">🛒</span>Shopping</a>
+        <a data-open="edge"><span class="gl">🎬</span>Video</a>
+      </div>`;
+    const search=page.querySelector(".edge-search");
+    search.addEventListener("keydown",e=>{ if(e.key==="Enter"&&search.value.trim()){ url.value="https://www.bing.com/search?q="+encodeURIComponent(search.value); results(search.value.trim()); }});
+    page.querySelectorAll("[data-open]").forEach(a=>a.onclick=()=>openApp(a.dataset.open));
+    page.querySelector("[data-store]").onclick=store;
+    page.querySelector("[data-wp]").onclick=wallpapers;
+  }
+  function wallpapers(){
+    url.value="https://wallpapers.wc";
+    page.style.alignItems="center"; page.style.paddingTop="30px";
+    page.innerHTML=`<div style="width:min(680px,90%)">
+      <div style="font-size:28px;font-weight:600;color:#111;margin-bottom:4px">🖼️ wallpapers.wc</div>
+      <div style="color:#777;font-size:12.5px;margin-bottom:18px">Premium 8K wallpapers, definitely not just CSS gradients</div>
+      <div class="wp-grid"></div>
+    </div>`;
+    const grid=page.querySelector(".wp-grid");
+    WALLPAPERS.forEach(w=>{
+      const file=w.n.replace(/\s+/g,"_")+".jpg";
+      const pics=nodeAt([...HOME_PATH,"Pictures"]);
+      const have=pics&&pics.children[file];
+      const card=el("div","wp-card");
+      card.innerHTML=`<div class="wp-prev" style="background:${w.g}"></div>
+        <div class="wp-i"><b>${w.n}</b>
+          <div class="wp-btns">
+            <button class="wp-btn pri" data-set>Set as wallpaper</button>
+            <button class="wp-btn" data-dl>${have?"Downloaded":"Download"}</button>
+          </div></div>`;
+      card.querySelector("[data-set]").onclick=()=>{
+        setWallpaper(w.g);
+        winDialog({icon:"🖼️",title:"wallpapers.wc",msg:`<b>${w.n}</b> applied. Looking fresh.`});
+      };
+      const dlBtn=card.querySelector("[data-dl]");
+      if(have) dlBtn.disabled=true;
+      dlBtn.onclick=()=>{
+        if(dlBtn.disabled) return;
+        dlBtn.disabled=true; dlBtn.textContent="…";
+        setTimeout(()=>{
+          const p=nodeAt([...HOME_PATH,"Pictures"]);
+          if(p){ p.children[file]={icon:"🖼️",art:{g:w.g,e:"🖼️"}}; saveFS(); refreshFX(); }
+          dlBtn.textContent="Downloaded";
+          winDialog({icon:"🖼️",title:"Download complete",msg:`<b>${file}</b> saved to Pictures.`});
+        },900);
+      };
+      grid.appendChild(card);
+    });
+  }
+  function results(q){
+    const qe=esc(q);
+    page.innerHTML=`<div style="width:min(640px,88%);align-self:center;text-align:left">
+      <div style="color:#605e5c;font-size:12px;margin:6px 0 14px">About 8,120,000 results for <b>${qe}</b></div>
+      <div style="margin-bottom:22px">
+        <div style="color:#1a0dab;font-size:18px;cursor:pointer" data-store>⬇️ ${qe} — FREE DOWNLOAD | winstore.wc</div>
+        <div style="color:#006621;font-size:12px">https://winstore.wc/download</div>
+        <div style="color:#4d5156;font-size:13px;margin-top:3px;line-height:1.5">Download ${qe} and totally-safe apps from the official WinClone App Store.</div>
+      </div>
+      ${[1,2,3].map(i=>`<div style="margin-bottom:22px">
+        <div style="color:#1a0dab;font-size:18px">${qe} — result ${i} | example.com</div>
+        <div style="color:#006621;font-size:12px">https://example.com/${encodeURIComponent(q)}/${i}</div>
+        <div style="color:#4d5156;font-size:13px;margin-top:3px;line-height:1.5">This is a simulated search result for “${qe}”. WinClone's Edge can't load the real web, but the chrome is faithful.</div>
+      </div>`).join("")}
+    </div>`;
+    page.style.alignItems="flex-start"; page.style.paddingTop="24px";
+    const s=page.querySelector("[data-store]"); if(s) s.onclick=store;
+  }
+  function store(){
+    url.value="https://winstore.wc";
+    page.style.alignItems="center"; page.style.paddingTop="30px";
+    page.innerHTML=`<div style="width:min(620px,90%)">
+      <div style="font-size:28px;font-weight:600;color:#111;margin-bottom:4px">⬇️ WinClone App Store</div>
+      <div style="color:#777;font-size:12.5px;margin-bottom:18px">All apps 100% verified* &nbsp;<small>(*not verified)</small></div>
+      <div class="store-list"></div>
+    </div>`;
+    const listEl=page.querySelector(".store-list");
+    const dl=nodeAt([...HOME_PATH,"Downloads"]);
+    STORE_APPS.forEach(a=>{
+      const row=el("div","store-app");
+      row.innerHTML=`<span class="gl">${a.icon}</span>
+        <div class="inf"><b>${a.name}</b><small>${a.desc}</small></div>
+        <button class="store-get">${dl&&dl.children[a.file]?"Downloaded":"Get"}</button>`;
+      const btn=row.querySelector("button");
+      if(dl&&dl.children[a.file]) btn.disabled=true;
+      btn.onclick=()=>{
+        if(btn.disabled) return;
+        btn.disabled=true; let p=0;
+        const iv=setInterval(()=>{
+          p+=Math.floor(Math.random()*22)+8;
+          if(p>=100){
+            clearInterval(iv); btn.textContent="Downloaded";
+            const dls=nodeAt([...HOME_PATH,"Downloads"]);
+            if(dls){ dls.children[a.file]={icon:a.icon,exe:true,malware:!!a.malware,kind:a.kind,runMsg:a.runMsg}; saveFS(); refreshFX(); }
+            winDialog({icon:a.icon,title:"Download complete",
+              msg:`<b>${a.file}</b> saved to Downloads.<br><small style="color:#9a9a9a">Double-click it in File Explorer to run it.${a.malware?" What could go wrong.":""}</small>`});
+          } else btn.textContent=p+"%";
+        },260);
+      };
+      listEl.appendChild(row);
+    });
+  }
+  url.addEventListener("keydown",e=>{ if(e.key==="Enter"){
+    const q=url.value.replace(/^https?:\/\//,'').trim();
+    if(/winstore|store/.test(q)) store();
+    else if(/wallpaper/.test(q)) wallpapers();
+    else results(q||"bing.com");
+  }});
+  body.querySelector("[data-h]").onclick=home;
+  body.querySelector("[data-r]").onclick=home;
+  home();
+}
+
+/* ---- photos ---- */
+let PH_PENDING=null;
+const PH={loader:null};
+function openImageInPhotos(pn){
+  if(state.wins.photos && PH.loader){
+    if(state.wins.photos.min) toggleMin("photos",false);
+    focusWin("photos"); PH.loader(pn);
+  } else { PH_PENDING=pn; openApp("photos"); }
+}
+function buildPhotos(body,win){
+  let imgs=allImages(), idx=-1;
+  function gallery(){
+    imgs=allImages();
+    win.querySelector(".tt").textContent="Photos";
+    body.innerHTML=`<div style="display:flex;flex-direction:column;height:100%">
+      <div class="ph-bar"><b style="flex:1">🖼️ Photos — ${imgs.length} item(s)</b>
+        <button class="allbtn" data-imp>📥 Import from computer</button></div>
+      <div class="photos" style="flex:1"></div></div>`;
+    body.querySelector("[data-imp]").onclick=()=>importImages([...HOME_PATH,"Pictures"],gallery);
+    const grid=body.querySelector(".photos");
+    if(!imgs.length){ grid.innerHTML=`<div style="color:#888;padding:20px">No pictures found. Click “Import from computer” to add your own.</div>`; return; }
+    imgs.forEach((im,i)=>{
+      const art=artFor(im.name,im.item);
+      const p=el("div","photo");
+      p.style.background=art.g;
+      p.innerHTML=`<span>${art.e}</span><span class="pnm">${esc(im.name)}</span>`;
+      p.onclick=()=>{ idx=i; viewer(); };
+      grid.appendChild(p);
+    });
+  }
+  function viewer(){
+    const im=imgs[idx]; if(!im){ gallery(); return; }
+    const art=artFor(im.name,im.item);
+    win.querySelector(".tt").textContent=im.name+" — Photos";
+    body.innerHTML=`<div class="ph">
+      <div class="ph-bar">
+        <button class="edge-nav" data-g style="color:#ddd" title="All photos">▦</button>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(im.name)}&nbsp;&nbsp;<small style="color:#888">${esc(im.path.join("\\"))}</small></span>
+        <button class="allbtn" data-wall>Set as wallpaper</button>
+      </div>
+      <div class="ph-stage">
+        <div class="ph-img" style="background:${art.g}">${art.e}</div>
+        <button class="ph-nav" style="left:10px" data-prev>‹</button>
+        <button class="ph-nav" style="right:10px" data-next>›</button>
+      </div></div>`;
+    body.querySelector("[data-g]").onclick=gallery;
+    body.querySelector("[data-prev]").onclick=()=>{ idx=(idx-1+imgs.length)%imgs.length; viewer(); };
+    body.querySelector("[data-next]").onclick=()=>{ idx=(idx+1)%imgs.length; viewer(); };
+    body.querySelector("[data-wall]").onclick=()=>{
+      setWallpaper(art.g);
+      winDialog({icon:"🖼️",title:"Photos",msg:`<b>${esc(im.name)}</b> is now your wallpaper.`});
+    };
+  }
+  PH.loader=pn=>{
+    imgs=allImages();
+    idx=imgs.findIndex(im=>im.name===pn.name&&im.path.join("/")===pn.path.join("/"));
+    if(idx<0) idx=imgs.length?0:-1;
+    if(idx>=0) viewer(); else gallery();
+  };
+  if(PH_PENDING){ PH.loader(PH_PENDING); PH_PENDING=null; } else gallery();
+}
+
+/* ---- media player ---- */
+let MP_PENDING=null;
+const MP={loader:null};
+function openMediaIn(pn){
+  if(state.wins.media && MP.loader){
+    if(state.wins.media.min) toggleMin("media",false);
+    focusWin("media"); MP.loader(pn);
+  } else { MP_PENDING=pn; openApp("media"); }
+}
+function buildMedia(body,win){
+  body.innerHTML=`<div class="mp">
+    <div class="mp-stage"><div style="color:#777;font-size:14px">Open a video or song from File Explorer 🎬</div></div>
+    <div class="mp-controls">
+      <button data-pp>▶</button>
+      <span class="mp-time">0:00 / 0:00</span>
+      <input type="range" data-seek min="0" max="100" value="0">
+      <span style="font-size:14px">🔊</span><input type="range" data-vol min="0" max="100" value="70">
+    </div></div>`;
+  const root=body.querySelector(".mp"), stage=body.querySelector(".mp-stage"),
+        pp=body.querySelector("[data-pp]"), seek=body.querySelector("[data-seek]"),
+        timeEl=body.querySelector(".mp-time");
+  const scenes=["🌅","🏙️","🚗","💥","🕵️","❤️","🌇","🎬"];
+  let cur=null, t=0, dur=1, playing=false, emojiEl=null;
+  const fmt=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
+  function load(pn){
+    cur=pn; t=0; playing=true; pp.textContent="⏸";
+    const node=nodeAt(pn.path);
+    const item=(node&&node.children)?node.children[pn.name]:null;
+    const art=artFor(pn.name,item||{});
+    const isAudio=/\.(mp3|wav)$/i.test(pn.name);
+    dur=isAudio?222:135;
+    win.querySelector(".tt").textContent=pn.name+" — Media Player";
+    if(isAudio){
+      stage.style.background="radial-gradient(60% 60% at 50% 40%,#20304a,#0c1420)";
+      stage.innerHTML=`<div class="mp-disc">🎵</div>
+        <div class="mp-eq">${"<i></i>".repeat(7)}</div>
+        <div class="mp-caption">${esc(pn.name)} — WinClone Records</div>`;
+      stage.querySelectorAll(".mp-eq i").forEach((b,i)=>{
+        b.style.animationDelay=(i*0.09)+"s"; b.style.animationDuration=(0.5+(i%3)*0.15)+"s";
+      });
+      emojiEl=null;
+    }else{
+      stage.style.background="#000";
+      stage.innerHTML=`<div class="mp-video" style="background-image:${art.g}"><span></span></div>
+        <div class="mp-caption">${esc(pn.name)} — a WinClone Pictures production</div>`;
+      emojiEl=stage.querySelector(".mp-video span");
+    }
+    upd();
+  }
+  function upd(){
+    seek.value=dur?(t/dur)*100:0;
+    timeEl.textContent=fmt(t)+" / "+fmt(dur);
+    if(emojiEl) emojiEl.textContent=scenes[Math.floor(t/18)%scenes.length];
+    root.classList.toggle("paused",!playing);
+  }
+  const iv=setInterval(()=>{
+    if(!body.isConnected){ clearInterval(iv); return; }
+    if(!playing||!cur) return;
+    t+=0.25;
+    if(t>=dur){ t=dur; playing=false; pp.textContent="↺"; }
+    upd();
+  },250);
+  pp.onclick=()=>{
+    if(!cur) return;
+    if(t>=dur){ t=0; playing=true; }
+    else playing=!playing;
+    pp.textContent=playing?"⏸":"▶"; upd();
+  };
+  seek.oninput=()=>{ if(!cur) return; t=dur*(+seek.value/100); if(!playing&&t<dur) pp.textContent="▶"; upd(); };
+  MP.loader=load;
+  if(MP_PENDING){ load(MP_PENDING); MP_PENDING=null; }
+}
+
+function buildRecycle(body){
+  function render(){
+    if(!body.isConnected) return;
+    if(!RECYCLE.length){
+      body.innerHTML=`<div class="recycle-empty"><div class="gl">🗑️</div><div>Recycle Bin is empty</div></div>`;
+      return;
+    }
+    body.innerHTML=`<div style="display:flex;flex-direction:column;height:100%">
+      <div class="rc-bar">
+        <button class="allbtn" data-rc="restoreall">Restore all items</button>
+        <button class="allbtn" data-rc="empty">Empty Recycle Bin</button>
+      </div>
+      <div class="fx-grid" style="flex:1;overflow:auto"></div>
+    </div>`;
+    const grid=body.querySelector(".fx-grid");
+    RECYCLE.forEach((r,idx)=>{
+      const t=el("div","fx-tile");
+      t.innerHTML=`<span class="gl">${r.item.folder?"📁":(r.item.icon||"📄")}</span><span class="nm">${esc(r.name)}</span>`;
+      t.title="Original location: "+r.path.join("\\");
+      t.oncontextmenu=e=>{ e.preventDefault(); e.stopPropagation();
+        showCtx(e.clientX,e.clientY,[
+          {icon:"♻️",label:"Restore",action:()=>{ restoreFromRecycle(idx); render(); }},
+        ]);
+      };
+      t.ondblclick=()=>{ restoreFromRecycle(idx); render(); };
+      grid.appendChild(t);
+    });
+    body.querySelector('[data-rc="restoreall"]').onclick=()=>{
+      while(RECYCLE.length) restoreFromRecycle(0);
+      render();
+    };
+    body.querySelector('[data-rc="empty"]').onclick=()=>{
+      winDialog({icon:"🗑️",title:"Empty Recycle Bin",
+        msg:`Permanently delete ${RECYCLE.length} item(s)? System files deleted here are <b>gone for good</b> (until a BIOS factory reset).`,
+        buttons:[{label:"Empty it",action:()=>{ RECYCLE.length=0; saveRecycle(); render(); applySystemHealth(); }},{label:"Cancel",primary:true}]});
+    };
+  }
+  fxRefreshers.push(render);
+  render();
+}
+
+function buildDefender(body){
+  function walk(node,path,out){
+    const kids=node.children||{};
+    Object.keys(kids).forEach(k=>{
+      const it=kids[k];
+      if(it.malware) out.push({name:k,path:[...path]});
+      if(it.folder) walk(it,[...path,k],out);
+    });
+  }
+  function threatsNow(){ const out=[]; walk({children:VFS},[],out); return out; }
+  function render(){
+    if(!body.isConnected) return;
+    const st=systemStatus();
+    const bad=threatsNow().length>0||infected();
+    body.innerHTML=`<div class="av">
+      <div class="av-hero ${bad?'bad':''}">
+        <span class="shield">${bad?'🚨':'🛡️'}</span>
+        <div><h3>Cork Defender</h3>
+          <div class="sub">${bad?'Threats detected. Your PC is at risk.':'No action needed. Your PC is protected.'}</div>
+          ${st.damaged?`<div class="sub" style="color:#ff8a80;margin-top:4px">⚠ ${st.missing.length} system file(s) missing — Defender can't repair those. Restore from the Recycle Bin, or factory-reset from the BIOS.</div>`:''}
+        </div>
+      </div>
+      <button class="av-btn" data-scan>Quick scan</button>
+      <div class="av-scan" style="display:none">
+        <div class="av-bar"><i></i></div>
+        <div class="av-log"></div>
+      </div>
+      <div class="av-results"></div>
+    </div>`;
+    const scanBtn=body.querySelector("[data-scan]"), scanBox=body.querySelector(".av-scan"),
+          bar=body.querySelector(".av-bar i"), log=body.querySelector(".av-log"), res=body.querySelector(".av-results");
+    scanBtn.onclick=()=>{
+      scanBtn.disabled=true; scanBox.style.display="block"; res.innerHTML=""; log.innerHTML="";
+      const lines=["Scanning C:\\Windows\\System…","Scanning C:\\Program Files…","Scanning C:\\Users\\User\\Downloads…",
+        "Checking startup items…","Scanning cat pictures… none found (concerning)","Analyzing suspicious vibes…",
+        "Cross-referencing Cork threat database…"];
+      let i=0,p=0;
+      const iv=setInterval(()=>{
+        p+=Math.floor(Math.random()*9)+4; if(p>100)p=100;
+        bar.style.width=p+"%";
+        if(i<lines.length&&Math.random()<0.55){ log.innerHTML+=lines[i++]+"<br>"; log.scrollTop=log.scrollHeight; }
+        if(p>=100){
+          clearInterval(iv);
+          while(i<lines.length){ log.innerHTML+=lines[i++]+"<br>"; }
+          log.scrollTop=log.scrollHeight;
+          finish();
+        }
+      },180);
+    };
+    function finish(){
+      const files=threatsNow();
+      const rows=[]; const seen=new Set();
+      INFECTIONS.forEach(i=>{ if(seen.has(i.kind)) return; seen.add(i.kind);
+        const m=MALWARE[i.kind]||{}; rows.push({fam:m.family||"Malware", name:m.name||i.kind, sub:"active infection"}); });
+      if(files.length) rows.push({fam:"Malware", name:files.length+" infected file(s) on disk", sub:"Downloads / System / …"});
+      if(!rows.length){
+        res.innerHTML=`<div style="color:#5cd68a;margin-top:12px">✅ Scan complete — 0 threats found. Squeaky clean.</div>`;
+        scanBtn.disabled=false;
+        return;
+      }
+      res.innerHTML=`<div style="margin:12px 0 8px;color:#ff8a80">⚠ ${rows.length} threat(s) found:</div>`+
+        rows.map(t=>`<div class="av-threat"><span class="gl">🦠</span>
+        <div><b>${t.fam}:WC/${t.name.replace(/[^A-Za-z0-9]/g,"")}</b><br><small style="color:#e0a9a3">${t.name} — ${t.sub}</small></div></div>`).join("")+
+        `<button class="av-btn danger" data-clean>Remove all threats</button>`;
+      res.querySelector("[data-clean]").onclick=()=>{
+        threatsNow().forEach(f=>{ const parent=nodeAt(f.path); if(parent&&parent.children) delete parent.children[f.name]; });
+        disinfect(); saveFS(); refreshFX();
+        winDialog({icon:"🛡️",title:"Cork Defender",msg:"All threats removed, encrypted files decrypted, and effects stopped. Your PC is clean. 🎉"});
+        render();
+      };
+    }
+  }
+  fxRefreshers.push(render);
+  render();
+}
+
+/* ---- Paint ---- */
+function buildPaint(body){
+  body.innerHTML=`<div class="pt">
+    <div class="pt-tools">
+      <div class="pt-colors"></div>
+      <span class="pt-sep"></span>
+      <label class="pt-size">Size <input type="range" min="1" max="40" value="6"></label>
+      <button class="pt-btn" data-clear>Clear</button>
+      <button class="pt-btn pri" data-save>Save to Pictures</button>
+    </div>
+    <div class="pt-stage"><canvas></canvas></div>
+  </div>`;
+  const cv=body.querySelector("canvas"), ctx=cv.getContext("2d"), stage=body.querySelector(".pt-stage");
+  let color="#000000", size=6, drawing=false, last=null;
+  const cwrap=body.querySelector(".pt-colors");
+  ["#000000","#ffffff","#e81123","#ff8c00","#fff100","#16c60c","#0067c0","#8a3ffc","#7a5230","#f472b6"].forEach((c,idx)=>{
+    const s=el("button","pt-sw"+(idx===0?" sel":"")); s.style.background=c;
+    s.onclick=()=>{ color=c; cwrap.querySelectorAll(".pt-sw").forEach(x=>x.classList.remove("sel")); s.classList.add("sel"); };
+    cwrap.appendChild(s);
+  });
+  function fit(){
+    const r=stage.getBoundingClientRect();
+    const data=cv.width?ctx.getImageData(0,0,cv.width,cv.height):null;
+    cv.width=Math.max(50,r.width-2); cv.height=Math.max(50,r.height-2);
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+    if(data) ctx.putImageData(data,0,0);
+  }
+  const pos=e=>{ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; };
+  const dot=p=>{ ctx.fillStyle=color; ctx.beginPath(); ctx.arc(p.x,p.y,size/2,0,7); ctx.fill(); };
+  cv.addEventListener("mousedown",e=>{ drawing=true; last=pos(e); dot(last); });
+  const move=e=>{ if(!drawing||!cv.isConnected) return; const p=pos(e); ctx.strokeStyle=color; ctx.lineWidth=size; ctx.lineCap="round"; ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
+  document.addEventListener("mousemove",move);
+  document.addEventListener("mouseup",()=>drawing=false);
+  body.querySelector(".pt-size input").oninput=e=>size=+e.target.value;
+  body.querySelector("[data-clear]").onclick=()=>{ ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height); };
+  body.querySelector("[data-save]").onclick=()=>{
+    const data=cv.toDataURL("image/png");
+    inputDialog({title:"Save to Pictures",value:"drawing.png",ok:"Save",cb:nm=>{
+      if(!/\.(png|jpe?g|bmp)$/i.test(nm)) nm+=".png";
+      const pics=nodeAt([...HOME_PATH,"Pictures"]);
+      if(pics){ pics.children[uniqueName(pics,nm)]={icon:"🖼️",img:data}; saveFS(); refreshFX(); winDialog({icon:"🎨",title:"Paint",msg:"Saved <b>"+esc(nm)+"</b> to Pictures. Open it in Photos or set it as wallpaper."}); }
+    }});
+  };
+  requestAnimationFrame(fit);
+  const ro=setInterval(()=>{ if(!body.isConnected){ clearInterval(ro); document.removeEventListener("mousemove",move); return; } const r=stage.getBoundingClientRect(); if(Math.abs(r.width-2-cv.width)>4||Math.abs(r.height-2-cv.height)>4) fit(); },600);
+}
+
+/* ---- Task Manager ---- */
+function buildTaskmgr(body){
+  body.innerHTML=`<div class="tm">
+    <div class="tm-sum">
+      <div class="tm-meter"><div>CPU</div><div class="tm-bar"><i data-cpu></i></div><span data-cpuv>0%</span></div>
+      <div class="tm-meter"><div>Memory</div><div class="tm-bar mem"><i data-mem></i></div><span data-memv>0%</span></div>
+    </div>
+    <div class="tm-head"><span>Name</span><span>CPU</span><span>Memory</span><span></span></div>
+    <div class="tm-list"></div>
+  </div>`;
+  const list=body.querySelector(".tm-list"), cpuBar=body.querySelector("[data-cpu]"), memBar=body.querySelector("[data-mem]");
+  function procs(){
+    const base=[
+      {n:"System",i:"⚙️",cpu:1,mem:120},
+      {n:"wclogon.exe",i:"🔐",cpu:0,mem:32},
+      {n:"explorer.exe",i:"📁",cpu:1+rnd(2),mem:210},
+      {n:"Cork Defender",i:"🛡️",cpu:2,mem:98},
+    ];
+    Object.keys(state.wins).forEach(id=>{ const a=APPS[id]; if(a) base.push({n:a.title,i:a.icon,cpu:1+rnd(5),mem:60+rnd(180),win:id}); });
+    if(hasKind("miner")) base.push({n:"BitCorkMiner.exe",i:"⛏️",cpu:82+rnd(15),mem:340+rnd(120),mal:1});
+    if(hasKind("backdoor")) base.push({n:"svch0st_rat.exe",i:"🚪",cpu:3+rnd(6),mem:44+rnd(30),mal:1});
+    if(hasKind("keylogger")) base.push({n:"klog32.exe",i:"⌨️",cpu:1,mem:18,mal:1});
+    if(hasKind("spyware")) base.push({n:"peepcam.exe",i:"👁️",cpu:5+rnd(8),mem:120,mal:1});
+    if(hasKind("scareware")) base.push({n:"adserver.exe",i:"📢",cpu:2,mem:70,mal:1});
+    const worms=wormCount(); for(let i=0;i<Math.min(worms,6);i++) base.push({n:"wcworm_"+i+".exe",i:"🪱",cpu:4+rnd(7),mem:20+rnd(20),mal:1});
+    return base;
+  }
+  function render(){
+    if(!body.isConnected) return;
+    const ps=procs();
+    let totalCpu=ps.reduce((a,b)=>a+b.cpu,0); if(hasKind("miner")) totalCpu=Math.max(totalCpu,96);
+    totalCpu=Math.min(100,totalCpu);
+    const totalMem=Math.min(100,Math.round(ps.reduce((a,b)=>a+b.mem,0)/320));
+    cpuBar.style.width=totalCpu+"%"; body.querySelector("[data-cpuv]").textContent=totalCpu+"%";
+    memBar.style.width=totalMem+"%"; body.querySelector("[data-memv]").textContent=totalMem+"%";
+    cpuBar.classList.toggle("hot",totalCpu>85);
+    list.innerHTML="";
+    ps.sort((a,b)=>b.cpu-a.cpu).forEach(p=>{
+      const row=el("div","tm-row"+(p.mal?" mal":""));
+      row.innerHTML=`<span class="tm-name">${p.i} ${p.n}</span><span>${p.cpu}%</span><span>${p.mem} MB</span>
+        <span>${(p.win||p.mal)?'<button class="tm-end">End task</button>':''}</span>`;
+      const btn=row.querySelector(".tm-end");
+      if(btn) btn.onclick=()=>{
+        if(p.win){ closeWin(p.win); render(); }
+        else winDialog({icon:"🛡️",title:"Task Manager",msg:"<b>Access denied.</b> This process is protected by a rootkit and respawns instantly. Use <b>Cork Defender</b> to remove it properly."});
+      };
+      list.appendChild(row);
+    });
+  }
+  const iv=setInterval(()=>{ if(!body.isConnected){ clearInterval(iv); return; } render(); },1600);
+  render();
+}
+
+/* ---- Minesweeper ---- */
+function buildMines(body){
+  const N=9, MINES=10;
+  body.innerHTML=`<div class="ms">
+    <div class="ms-bar"><span class="ms-flags">🚩 <b>0</b></span><button class="ms-face">🙂</button><span class="ms-time">⏱️ <b>0</b></span></div>
+    <div class="ms-grid"></div>
+    <div class="ms-msg">Left-click to reveal · right-click to flag</div>
+  </div>`;
+  const gridEl=body.querySelector(".ms-grid"), face=body.querySelector(".ms-face"), msg=body.querySelector(".ms-msg");
+  const flagsEl=body.querySelector(".ms-flags b"), timeEl=body.querySelector(".ms-time b");
+  gridEl.style.gridTemplateColumns=`repeat(${N},1fr)`;
+  let cells,over,started,timer,secs,flags;
+  function reset(){
+    cells=[]; over=false; started=false; secs=0; flags=0; clearInterval(timer);
+    flagsEl.textContent=0; timeEl.textContent=0; msg.textContent="Left-click reveal · right-click flag"; face.textContent="🙂"; gridEl.innerHTML="";
+    for(let i=0;i<N*N;i++){ const c={mine:false,rev:false,flag:false,n:0,el:el("button","ms-cell")}; cells.push(c);
+      c.el.oncontextmenu=e=>{ e.preventDefault(); flag(i); };
+      c.el.onclick=()=>reveal(i);
+      gridEl.appendChild(c.el);
+    }
+  }
+  function neighbors(i){ const r=Math.floor(i/N),c=i%N,o=[]; for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){ if(!dr&&!dc)continue; const nr=r+dr,nc=c+dc; if(nr>=0&&nr<N&&nc>=0&&nc<N)o.push(nr*N+nc); } return o; }
+  function plant(safe){ let p=0; while(p<MINES){ const i=rnd(N*N); if(i===safe||cells[i].mine)continue; cells[i].mine=true; p++; } for(let i=0;i<N*N;i++){ if(!cells[i].mine) cells[i].n=neighbors(i).filter(j=>cells[j].mine).length; } }
+  function reveal(i){
+    if(over||cells[i].flag||cells[i].rev) return;
+    if(!started){ started=true; plant(i); timer=setInterval(()=>{ secs++; timeEl.textContent=secs; },1000); }
+    const c=cells[i]; c.rev=true; c.el.classList.add("rev");
+    if(c.mine){ c.el.textContent="💥"; return lose(); }
+    if(c.n){ c.el.textContent=c.n; c.el.dataset.n=c.n; } else neighbors(i).forEach(reveal);
+    win();
+  }
+  function flag(i){ const c=cells[i]; if(over||c.rev) return; c.flag=!c.flag; c.el.textContent=c.flag?"🚩":""; c.el.classList.toggle("flag",c.flag); flags+=c.flag?1:-1; flagsEl.textContent=flags; }
+  function lose(){ over=true; clearInterval(timer); face.textContent="😵"; msg.textContent="💥 Boom! Click the face to retry."; cells.forEach(c=>{ if(c.mine&&!c.rev){ c.el.textContent="💣"; c.el.classList.add("rev"); } }); }
+  function win(){ if(cells.every(c=>c.rev||c.mine)){ over=true; clearInterval(timer); face.textContent="😎"; msg.textContent="🎉 Cleared! You win."; } }
+  face.onclick=reset;
+  reset();
+}
+
+/* ---- Snake ---- */
+function buildSnake(body){
+  body.innerHTML=`<div class="sn">
+    <div class="sn-hud"><span>Score <b class="sn-score">0</b></span><span class="sn-state">Arrows/WASD to move</span><button class="sn-btn">▶ Start</button></div>
+    <canvas width="360" height="360"></canvas>
+    <div class="sn-tip">Tip: Space to start · walls wrap around</div>
+  </div>`;
+  const cv=body.querySelector("canvas"), ctx=cv.getContext("2d");
+  const scoreEl=body.querySelector(".sn-score"), stateEl=body.querySelector(".sn-state"), btn=body.querySelector(".sn-btn");
+  const G=18, C=cv.width/G;
+  let snake,dir,nd,food,score,alive,loop;
+  function reset(){ snake=[{x:9,y:9}]; dir={x:1,y:0}; nd=dir; score=0; alive=true; place(); scoreEl.textContent=0; draw(); }
+  function place(){ do{ food={x:rnd(G),y:rnd(G)}; }while(snake.some(s=>s.x===food.x&&s.y===food.y)); }
+  function step(){
+    dir=nd;
+    const h={x:(snake[0].x+dir.x+G)%G,y:(snake[0].y+dir.y+G)%G};
+    if(snake.some(s=>s.x===h.x&&s.y===h.y)) return end();
+    snake.unshift(h);
+    if(h.x===food.x&&h.y===food.y){ score++; scoreEl.textContent=score; place(); } else snake.pop();
+    draw();
+  }
+  function draw(){
+    ctx.fillStyle="#0c1220"; ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.fillStyle="#e0491c"; ctx.fillRect(food.x*C+2,food.y*C+2,C-4,C-4);
+    snake.forEach((s,i)=>{ ctx.fillStyle=i===0?"#4cc2ff":"#2f8fd0"; ctx.fillRect(s.x*C+1,s.y*C+1,C-2,C-2); });
+  }
+  function start(){ if(loop) return; if(!alive) reset(); stateEl.textContent="Go!"; btn.textContent="Restart"; loop=setInterval(step,110); }
+  function end(){ alive=false; clearInterval(loop); loop=null; stateEl.textContent="Game over — score "+score; btn.textContent="▶ Start"; }
+  btn.onclick=()=>{ if(loop){ clearInterval(loop); loop=null; reset(); start(); } else start(); };
+  const key=e=>{
+    if(!body.isConnected){ document.removeEventListener("keydown",key); clearInterval(loop); return; }
+    if(!state.wins.snake || state.focused!=="snake") return;
+    const k=e.key;
+    if(k===" "){ e.preventDefault(); if(!loop) start(); return; }
+    if((k==="ArrowUp"||k==="w")&&dir.y===0) nd={x:0,y:-1};
+    else if((k==="ArrowDown"||k==="s")&&dir.y===0) nd={x:0,y:1};
+    else if((k==="ArrowLeft"||k==="a")&&dir.x===0) nd={x:-1,y:0};
+    else if((k==="ArrowRight"||k==="d")&&dir.x===0) nd={x:1,y:0};
+  };
+  document.addEventListener("keydown",key);
+  reset();
+}
+
+/* ---- Archive viewer ---- */
+function buildArchive(body,win){
+  function load(pn){
+    if(!pn||!pn.name){ win.querySelector(".tt").textContent="Archive"; body.innerHTML=`<div style="padding:20px;color:#888">Open an archive (.zip / .rar) from File Explorer.</div>`; return; }
+    const node=nodeAt(pn.path), item=node&&node.children?node.children[pn.name]:null;
+    win.querySelector(".tt").textContent=pn.name+" — Archive";
+    if(!item||!item.archive){ body.innerHTML=`<div style="padding:20px;color:#888">That file isn't an archive.</div>`; return; }
+    const kids=item.children||{};
+    body.innerHTML=`<div style="display:flex;flex-direction:column;height:100%">
+      <div class="rc-bar"><b style="align-self:center;flex:1">🗜️ ${esc(pn.name)} — ${Object.keys(kids).length} item(s)</b><button class="allbtn" data-x>Extract all here</button></div>
+      <div class="fx-grid" style="flex:1;overflow:auto"></div></div>`;
+    const grid=body.querySelector(".fx-grid");
+    if(!Object.keys(kids).length) grid.innerHTML=`<div style="color:#888;padding:20px">This archive is empty.</div>`;
+    Object.keys(kids).forEach(k=>{ const it=kids[k]; const t=el("div","fx-tile");
+      t.innerHTML=`<span class="gl">${it.folder?"📁":(it.icon||"📄")}</span><span class="nm">${esc(k)}</span>`; grid.appendChild(t); });
+    body.querySelector("[data-x]").onclick=()=>{ extractArchive(pn.path,pn.name,item); winDialog({icon:"📦",title:"Extract",msg:"Extracted to <b>"+esc(pn.path[pn.path.length-1])+"</b>."}); };
+  }
+  ARC.loader=load;
+  if(ARC_PENDING){ load(ARC_PENDING); ARC_PENDING=null; } else load(null);
+}
+
+/* ---- HTML viewer ---- */
+function buildHtmlView(body,win){
+  function load(pn){
+    const node=pn&&nodeAt(pn.path), item=(node&&node.children)?node.children[pn.name]:null;
+    win.querySelector(".tt").textContent=(pn&&pn.name?pn.name:"HTML Viewer")+" — HTML Viewer";
+    const html=item?(item.content||""):"";
+    body.innerHTML=`<div class="hv">
+      <div class="hv-bar"><span class="hv-url">🌐 file:///C:/…/${pn&&pn.name?esc(pn.name):""}</span>
+        <button class="allbtn" data-src>View source</button>
+        <button class="allbtn" data-edit>Edit</button></div>
+      <iframe class="hv-frame" sandbox="allow-scripts allow-modals allow-popups"></iframe></div>`;
+    const f=body.querySelector("iframe"); f.srcdoc=html;
+    body.querySelector("[data-src]").onclick=()=>{ f.srcdoc=`<pre style="white-space:pre-wrap;padding:14px;font-family:Consolas,monospace;font-size:13px;color:#222">${html.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre>`; };
+    body.querySelector("[data-edit]").onclick=()=>{ if(pn&&pn.name) openFileInNotepad({path:pn.path,name:pn.name}); };
+  }
+  HV.loader=load;
+  if(HV_PENDING){ load(HV_PENDING); HV_PENDING=null; } else body.innerHTML=`<div style="padding:20px;color:#888">Open an .html file from File Explorer.</div>`;
+}
+
+/* ============================ WI-FI ============================ */
+const WIFI_NETS=[
+  {n:"HOME-5G",lock:true},
+  {n:"HOME-5G_Guest",lock:true},
+  {n:"TP-Link_2A4F",lock:true},
+  {n:"NETGEAR-Munroe",lock:true},
+  {n:"FBI Surveillance Van #4",lock:true},
+  {n:"PrettyFlyForAWiFi",lock:true},
+  {n:"It Hurts When IP",lock:false},
+];
+let wifiConn="HOME-5G";
+function renderWifi(){
+  const w=$("#wifilist"); w.innerHTML="";
+  const on=$('#quick .qs-tile[data-q="wifi"]').classList.contains("on");
+  if(!on){ w.innerHTML=`<div style="color:#9a9a9a;font-size:12px;padding:6px">Wi-Fi is turned off.</div>`; return; }
+  WIFI_NETS.forEach(net=>{
+    const isConn=wifiConn===net.n;
+    const row=el("div","wifi-row",
+      `<span class="sig">📶</span><div class="meta">${net.n} ${net.lock?"🔒":""}<small>${isConn?"Connected, secured":(net.lock?"Secured":"Open")}</small></div>${isConn?'<span class="conn">✓</span>':""}`);
+    row.onclick=()=>{
+      if(isConn) return;
+      row.querySelector("small").textContent="Connecting…";
+      setTimeout(()=>{ wifiConn=net.n; renderWifi(); },700+Math.random()*700);
+    };
+    w.appendChild(row);
+  });
+}
+
+/* ============================ RECOVERY MODE (WinRE) ============================ */
+function repairSystem(){
+  const def=defaultFS();
+  if(!VFS["C:"]) VFS["C:"]=def["C:"];
+  const c=VFS["C:"];
+  if(!c.children["Windows"]) c.children["Windows"]=def["C:"].children["Windows"];
+  const w=c.children["Windows"];
+  if(!w.children["System"]) w.children["System"]=def["C:"].children["Windows"].children["System"];
+  const s=w.children["System"];
+  const defSys=def["C:"].children["Windows"].children["System"].children;
+  Object.keys(defSys).forEach(k=>{ if(!s.children[k]) s.children[k]=defSys[k]; });
+  for(let i=RECYCLE.length-1;i>=0;i--){
+    const r=RECYCLE[i];
+    if(r.item&&(r.item.sys||r.name==="Windows"||r.name==="System")) RECYCLE.splice(i,1);
+  }
+  saveFS(); saveRecycle(); refreshFX(); applySystemHealth();
+}
+function bootRecovery(){
+  stopAllEffectsUI();
+  const R=$("#recovery"); R.style.display="flex";
+  rScreen("preparing");
+}
+function rExit(){
+  $("#recovery").style.display="none";
+  $("#login").classList.remove("hide"); $("#lg-pass").value="";
+  applySystemHealth();
+}
+function rScreen(s){
+  const R=$("#recovery");
+  R.classList.toggle("black", ["preparing","diagnosing","restarting","off","srscan","resetting"].includes(s));
+  const tiles=arr=>`<div class="r-tiles">${arr.map((t,i)=>
+    `<div class="r-tile" data-i="${i}"><span class="ric">${t[0]}</span><div>${t[1]}${t[2]?`<small>${t[2]}</small>`:""}</div></div>`).join("")}</div>`;
+  const wire=arr=>R.querySelectorAll(".r-tile").forEach(el2=>el2.onclick=()=>arr[+el2.dataset.i][3]());
+
+  if(s==="preparing"){
+    R.innerHTML=`<div class="r-center"><div class="r-spin"></div><div>Preparing Automatic Repair</div></div>`;
+    setTimeout(()=>rScreen("diagnosing"),2200);
+  }
+  else if(s==="diagnosing"){
+    R.innerHTML=`<div class="r-center"><div class="r-spin"></div><div>Diagnosing your PC</div></div>`;
+    setTimeout(()=>rScreen("autofail"),2400);
+  }
+  else if(s==="autofail"){
+    R.innerHTML=`<div class="r-wrap"><h1>Automatic Repair</h1>
+      <h2>Your PC did not start correctly</h2>
+      <div class="r-sub">A required system file is missing (<b>systemwinclone.sys</b>). Press “Restart” to restart your PC, which can sometimes fix the problem (it will not fix the problem). You can also press “Advanced options” to try other options to repair your PC.<br><br>
+      Log file: C:\\Windows\\System32\\Logfiles\\Srt\\SrtTrail.txt</div>
+      <div><button class="r-back" data-a="restart">Restart</button><button class="r-back" data-a="adv">Advanced options</button></div></div>`;
+    R.querySelector('[data-a="restart"]').onclick=()=>rScreen("restarting");
+    R.querySelector('[data-a="adv"]').onclick=()=>rScreen("choose");
+  }
+  else if(s==="restarting"){
+    R.innerHTML=`<div class="r-center"><div class="r-spin"></div><div>Restarting</div></div>`;
+    setTimeout(()=>{ systemStatus().critical ? rScreen("preparing") : rExit(); },2000);
+  }
+  else if(s==="choose"){
+    const t=[
+      ["➡️","Continue","Exit and continue to WinClone 12",()=>rExit()],
+      ["🛠️","Troubleshoot","Reset your PC or see advanced options",()=>rScreen("troubleshoot")],
+      ["⏻","Turn off your PC","",()=>rScreen("off")],
+    ];
+    R.innerHTML=`<div class="r-wrap"><h1>Choose an option</h1><br>${tiles(t)}</div>`;
+    wire(t);
+  }
+  else if(s==="troubleshoot"){
+    const t=[
+      ["🔄","Reset this PC","Lets you choose to keep or remove your files, and then reinstalls WinClone",()=>rScreen("reset")],
+      ["⚙️","Advanced options","",()=>rScreen("advanced")],
+    ];
+    R.innerHTML=`<div class="r-wrap"><h1>Troubleshoot</h1><br>${tiles(t)}<br><button class="r-back">← Back</button></div>`;
+    wire(t); R.querySelector(".r-back").onclick=()=>rScreen("choose");
+  }
+  else if(s==="advanced"){
+    const t=[
+      ["🔧","Startup Repair","Fix problems that keep WinClone from loading",()=>rScreen("srscan")],
+      ["⌨️","Command Prompt","Use the Command Prompt for advanced troubleshooting",()=>rScreen("cmd")],
+      ["🖥️","UEFI Firmware Settings","Change settings in your PC's UEFI firmware",()=>{ $("#biosbtn").onclick(); }],
+    ];
+    R.innerHTML=`<div class="r-wrap"><h1>Advanced options</h1><br>${tiles(t)}<br><button class="r-back">← Back</button></div>`;
+    wire(t); R.querySelector(".r-back").onclick=()=>rScreen("troubleshoot");
+  }
+  else if(s==="srscan"){
+    R.innerHTML=`<div class="r-center"><div class="r-spin"></div><div>Diagnosing your PC</div><div style="font-size:13px;color:#9ab">Startup Repair is checking system files…</div></div>`;
+    setTimeout(()=>{
+      if(systemStatus().damaged){ repairSystem(); rScreen("srfixed"); }
+      else rScreen("srfail");
+    },3200);
+  }
+  else if(s==="srfixed"){
+    R.innerHTML=`<div class="r-wrap"><h1>Startup Repair</h1>
+      <h2>Startup Repair has repaired your PC</h2>
+      <div class="r-sub">Missing system files were restored from the recovery image. Your files were not affected.<br>Restarting…</div></div>`;
+    setTimeout(()=>rExit(),2600);
+  }
+  else if(s==="srfail"){
+    R.innerHTML=`<div class="r-wrap"><h1>Startup Repair</h1>
+      <h2>Startup Repair couldn't repair your PC</h2>
+      <div class="r-sub">…because there was nothing wrong with it. Classic Startup Repair.<br><br>
+      Log file: C:\\Windows\\System32\\Logfiles\\Srt\\SrtTrail.txt</div>
+      <div><button class="r-back" data-a="off">Shut down</button><button class="r-back" data-a="adv">Advanced options</button></div></div>`;
+    R.querySelector('[data-a="off"]').onclick=()=>rScreen("off");
+    R.querySelector('[data-a="adv"]').onclick=()=>rScreen("advanced");
+  }
+  else if(s==="cmd"){
+    R.innerHTML=`<div class="r-wrap" style="display:flex;flex-direction:column;align-items:flex-start">
+      <h2 style="margin-bottom:10px">Administrator: Command Prompt</h2>
+      <div class="r-term"></div><br><button class="r-back">← Back</button></div>`;
+    R.querySelector(".r-back").onclick=()=>rScreen("advanced");
+    const term=R.querySelector(".r-term");
+    const print=t=>{ const d=el("div"); d.textContent=t; term.appendChild(d); term.scrollTop=term.scrollHeight; };
+    print("WinClone Recovery Environment [Version 10.0.26100]");
+    print("");
+    function prompt(){
+      const line=el("div"); line.style.display="flex";
+      line.innerHTML=`<span>X:\\Sources&gt;</span>`;
+      const inp=el("input"); inp.autocomplete="off"; inp.spellcheck=false;
+      line.appendChild(inp); term.appendChild(line); inp.focus();
+      term.onclick=()=>{ if(!getSelection().toString()){ const last=term.querySelector("input:not([disabled])"); if(last) last.focus(); } };
+      inp.addEventListener("keydown",e=>{
+        if(e.key!=="Enter") return;
+        const cmd=inp.value.trim(); inp.disabled=true;
+        const [c,...args]=cmd.split(/\s+/);
+        switch((c||"").toLowerCase()){
+          case "": break;
+          case "help": print("Commands: sfc /scannow, dir, cls, bcdedit, exit"); break;
+          case "cls": term.innerHTML=""; break;
+          case "dir": print(" Directory of X:\\Sources"); print(""); print("   <DIR>  Recovery"); print("   <DIR>  SafeOS"); print("          boot.wim"); break;
+          case "bcdedit": print("Windows Boot Manager"); print("identifier    {bootmgr}"); print("device        partition=C:"); print("description   WinClone Boot Manager (do not taunt)"); break;
+          case "exit": rScreen("advanced"); return;
+          case "sfc":
+            if((args[0]||"").toLowerCase()!=="/scannow"){ print("Usage: sfc /scannow"); break; }
+            print("Beginning system scan. This process will take some time.");
+            print("");
+            let pc=0;
+            const iv=setInterval(()=>{
+              pc+=20;
+              print("Verification "+pc+"% complete.");
+              if(pc>=100){
+                clearInterval(iv);
+                if(systemStatus().damaged){
+                  repairSystem();
+                  print("");
+                  print("Windows Resource Protection found corrupt files and successfully repaired them.");
+                  print("systemwinclone.sys ... RESTORED");
+                  print("Reboot with 'exit' → Continue, or keep poking around.");
+                }else{
+                  print("");
+                  print("Windows Resource Protection did not find any integrity violations.");
+                }
+                prompt();
+              }
+            },420);
+            return;
+          default: print("'"+c+"' is not recognized as an internal or external command,"); print("operable program or batch file.");
+        }
+        prompt();
+      });
+    }
+    prompt();
+  }
+  else if(s==="reset"){
+    const t=[
+      ["📁","Keep my files","Just kidding — this is a factory reset either way. Everything goes back to default.",()=>rScreen("resetting")],
+      ["🧹","Remove everything","Removes all of your personal files, apps, downloads and infections",()=>rScreen("resetting")],
+    ];
+    R.innerHTML=`<div class="r-wrap"><h1>Reset this PC</h1><h2>Choose an option</h2>${tiles(t)}<br><button class="r-back">← Back</button></div>`;
+    wire(t); R.querySelector(".r-back").onclick=()=>rScreen("troubleshoot");
+  }
+  else if(s==="resetting"){
+    R.innerHTML=`<div class="r-center"><div class="r-spin"></div><div>Resetting this PC (<span id="rst-pct">1</span>%)</div><div style="font-size:12px;color:#888">This will take a moment. Do not turn off your imaginary PC.</div></div>`;
+    let p=1;
+    const iv=setInterval(()=>{
+      p+=Math.floor(Math.random()*9)+3;
+      if(p>=100){
+        p=100; clearInterval(iv);
+        setTimeout(()=>{
+          Object.keys(localStorage).filter(k=>k.startsWith("wc_")).forEach(k=>localStorage.removeItem(k));
+          location.reload();
+        },800);
+      }
+      const e2=$("#rst-pct"); if(e2) e2.textContent=p;
+    },300);
+  }
+  else if(s==="off"){
+    R.innerHTML=`<div class="r-center"><div class="r-spin"></div><div>Shutting down…</div></div>`;
+    setTimeout(()=>rExit(),1800);
+  }
+}
+
+/* ============================ WIRING ============================ */
+$("#startbtn").onclick = ()=>{ renderStartGrid(""); toggleFlyout("#startmenu"); const s=$("#start-search"); s.value=""; setTimeout(()=>s.focus(),60); };
+$("#searchbtn").onclick = ()=>{ renderStartGrid(""); toggleFlyout("#startmenu"); setTimeout(()=>$("#start-search").focus(),60); };
+$("#quickbtn").onclick = ()=>{ toggleFlyout("#quick"); $("#wifilist").classList.add("open"); renderWifi(); };
+$("#tray-clock").onclick = ()=>{ renderCalendar(); toggleFlyout("#cal"); };
+$("#widgetsbtn").onclick = ()=>openApp("edge");
+$("#start-search").addEventListener("input", e=>renderStartGrid(e.target.value));
+$("#start-search").addEventListener("keydown", e=>{
+  if(e.key==="Enter"){ const first=$("#sm-grid").querySelector(".sm-app"); if(first) first.click(); }
+});
+$("#powerbtn").onclick = ()=>{ closeFlyouts(); doShutdown(); };
+document.querySelectorAll("#quick .qs-tile").forEach(t=>t.onclick=()=>{
+  t.classList.toggle("on");
+  if(t.dataset.q==="wifi") renderWifi();
+});
+
+function doShutdown(){
+  stopAllEffectsUI();
+  const sd=$("#shutdown"); sd.style.display="flex"; $("#sd-text").textContent="Shutting down…";
+  setTimeout(()=>{
+    // close all windows, show login again
+    Object.keys(state.wins).forEach(closeWin);
+    sd.style.display="none";
+    $("#login").classList.remove("hide");
+    $("#lg-pass").value="";
+  }, 1800);
+}
+
+/* login */
+function signIn(){
+  $("#login").classList.add("hide");
+  setTimeout(()=>$("#lg-pass").blur(),100);
+  applySystemHealth();
+  refreshInfectionFX();
+  const st=systemStatus();
+  if(st.critical){
+    setTimeout(()=>winDialog({icon:"❌",title:"WinClone — Critical",
+      msg:"<b>systemwinclone.sys</b> is missing. This session is on borrowed time.<br><small style='color:#9a9a9a'>Restore it from the Recycle Bin, or factory-reset from the BIOS.</small>"}),2500);
+  }
+}
+$("#lg-go").onclick = signIn;
+$("#lg-pass").addEventListener("keydown", e=>{ if(e.key==="Enter") signIn(); });
+
+/* BIOS */
+$("#biosbtn").onclick = ()=>{
+  const st=systemStatus();
+  const h=$("#bios-health");
+  h.textContent = st.critical?"CRITICAL — system files missing":(st.damaged?"DEGRADED — system files missing":"OK");
+  h.style.color = st.damaged?"#ff6b6b":"#7cfc00";
+  const d=new Date();
+  $("#bios-time").textContent=d.toLocaleTimeString();
+  $("#bios-date").textContent=d.toLocaleDateString();
+  $("#bios").style.display="flex";
+};
+$("#bios-exit").onclick = ()=>$("#bios").style.display="none";
+$("#bios-reset").onclick = ()=>{
+  $("#bios").style.display="none";
+  const sd=$("#shutdown"); sd.style.display="flex";
+  $("#sd-text").textContent="Reinstalling WinClone…";
+  setTimeout(()=>{
+    Object.keys(localStorage).filter(k=>k.startsWith("wc_")).forEach(k=>localStorage.removeItem(k));
+    location.reload();
+  },2200);
+};
+
+/* keyboard: Win-ish shortcuts */
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape") { closeFlyouts(); $("#ctx").style.display="none"; $("#bios").style.display="none"; }
+});
+
+/* drop files onto the wallpaper -> move to Desktop */
+(function(){
+  const desk=$("#desktop");
+  desk.addEventListener("dragover",e=>{ if(DRAG && !e.target.closest(".window") && !e.target.closest(".dicon")){ e.preventDefault(); desk.classList.add("drop-target"); } });
+  desk.addEventListener("dragleave",e=>{ if(e.target===desk||e.target.id==="icons") desk.classList.remove("drop-target"); });
+  desk.addEventListener("drop",e=>{
+    if(!DRAG) return;
+    if(e.target.closest(".window")||e.target.closest(".dicon")) return;
+    e.preventDefault(); desk.classList.remove("drop-target");
+    moveItem(DRAG.path,DRAG.name,[...HOME_PATH,"Desktop"]);
+  });
+})();
+
+/* boot */
+renderDesktopIcons();
+renderTaskbarPins();
+renderStartGrid("");
+tick(); setInterval(tick,1000);
+document.body.classList.toggle("glitch", systemStatus().damaged);
+const savedWall=localStorage.getItem("wc_wall");
+if(savedWall) applyWallpaper(savedWall);
+setTimeout(()=>$("#lg-pass").focus(),400);
+</script>
+</body>
+</html>
