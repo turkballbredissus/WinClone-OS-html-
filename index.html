@@ -630,7 +630,7 @@
     <div class="qs-tile" data-q="save"><span class="gl">🔋</span> Battery saver</div>
   </div>
   <div class="qs-slider"><span>🔆</span><input type="range" min="0" max="100" value="80" id="bright"></div>
-  <div class="qs-slider"><span>🔊</span><input type="range" min="0" max="100" value="65" id="vol"></div>
+  <div class="qs-slider"><span id="vol-ic">🔊</span><input type="range" min="0" max="100" value="65" id="vol"></div>
   <div id="wifilist"></div>
 </div>
 
@@ -2756,11 +2756,13 @@ function buildYoutube(body,win){
         <div class="yt-up">More</div><div class="yt-uplist"></div></div></div>`;
     const player=body.querySelector(".yt-player");
     const f=document.createElement("iframe");
-    f.src=`https://www.youtube-nocookie.com/embed/${v.id}?rel=0&modestbranding=1`;
+    const originParam = location.protocol==="file:" ? "" : "&origin="+encodeURIComponent(location.origin);
+    f.src=`https://www.youtube-nocookie.com/embed/${v.id}?rel=0&modestbranding=1&enablejsapi=1${originParam}`;
     f.allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
     f.allowFullscreen=true; f.referrerPolicy="strict-origin-when-cross-origin";
     f.style.cssText="width:100%;height:100%;border:0";
     player.appendChild(f);
+    f.addEventListener("load",()=>setTimeout(()=>ytApply(f),700)); // apply master volume once the player is ready
     const up=body.querySelector(".yt-uplist");
     [...YT_RECENT,...YT_PICKS].filter(x=>x.id!==v.id).slice(0,8).forEach(x=>{
       const r=el("div","yt-uprow");
@@ -3005,6 +3007,29 @@ document.querySelectorAll("#quick .qs-tile").forEach(t=>t.onclick=()=>{
   t.classList.toggle("on");
   if(t.dataset.q==="wifi") renderWifi();
 });
+
+/* ---------- MASTER VOLUME ---------- */
+let masterVol = parseInt(localStorage.getItem("wc_vol"),10);
+if(isNaN(masterVol)) masterVol = 65;
+function ytApply(f){ // push master volume/mute to one YouTube iframe via its JS API
+  if(!f || !f.contentWindow) return;
+  const send=o=>{ try{ f.contentWindow.postMessage(JSON.stringify(o), "https://www.youtube-nocookie.com"); }catch(e){} };
+  if(masterVol===0){ send({event:"command",func:"mute",args:[]}); }
+  else { send({event:"command",func:"unMute",args:[]}); send({event:"command",func:"setVolume",args:[masterVol]}); }
+}
+function applyVolume(v){
+  masterVol = Math.max(0, Math.min(100, v|0));
+  try{ localStorage.setItem("wc_vol", masterVol); }catch(e){}
+  // real <video>/<audio> in the OS (future-proof; harmless now)
+  document.querySelectorAll("video,audio").forEach(m=>{ try{ m.volume=masterVol/100; m.muted=masterVol===0; }catch(e){} });
+  // any open YouTube players
+  document.querySelectorAll("iframe").forEach(f=>{ if(f.src && f.src.indexOf("youtube")>=0) ytApply(f); });
+  // icon reflects the level
+  const ic = masterVol===0 ? "🔇" : masterVol<34 ? "🔈" : masterVol<67 ? "🔉" : "🔊";
+  const vi=$("#vol-ic"); if(vi) vi.textContent=ic;
+  document.querySelectorAll("#quickbtn .tray-ic").forEach(s=>{ if(/🔊|🔉|🔈|🔇/.test(s.textContent)) s.textContent=ic; });
+}
+(function(){ const vs=$("#vol"); if(vs){ vs.value=masterVol; vs.addEventListener("input",e=>applyVolume(+e.target.value)); } applyVolume(masterVol); })();
 
 function doShutdown(){
   stopAllEffectsUI();
