@@ -469,6 +469,37 @@
   .hv-url{flex:1;font-size:12px;color:#333;background:#fff;border:1px solid #c4c9cf;border-radius:14px;padding:5px 14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hv-frame{flex:1;border:0;width:100%;background:#fff}
 
+  /* YouTube */
+  .yt{display:flex;flex-direction:column;height:100%;background:#0f0f0f;color:#f1f1f1}
+  .yt-bar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:9px 14px;background:#212121;border-bottom:1px solid #000}
+  .yt-logo{font-weight:700;font-size:14px;white-space:nowrap}
+  .yt-search{flex:1;min-width:60px;height:32px;border-radius:16px;border:1px solid #303030;background:#121212;color:#fff;padding:0 15px;outline:none;font-size:13px}
+  .yt-open{border:0;background:#cc0000;color:#fff;border-radius:16px;padding:8px 16px;font-size:12.5px;cursor:default;white-space:nowrap}
+  .yt-open:hover{background:#e60000}
+  .yt-back{border:0;background:transparent;color:#fff;font-size:19px;cursor:default;width:30px}
+  .yt-grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;padding:16px;align-content:flex-start}
+  .yt-card{cursor:default}
+  .yt-thumb{position:relative;height:120px;border-radius:11px;overflow:hidden;background:linear-gradient(135deg,#3a1c71,#cc2b5e)}
+  .yt-thumb .ph{position:absolute;inset:0;display:grid;place-items:center;font-size:34px;color:rgba(255,255,255,.9)}
+  .yt-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .yt-meta{padding:9px 2px}
+  .yt-t{font-size:13.5px;font-weight:600;line-height:1.3;max-height:36px;overflow:hidden}
+  .yt-c{font-size:12px;color:#aaa;margin-top:3px}
+  .yt-note{flex:0 0 auto;padding:8px 14px;font-size:11px;color:#8a8a8a;background:#181818;border-top:1px solid #000}
+  .yt-watch{flex:1;overflow:auto;padding:16px;max-width:900px;margin:0 auto;width:100%}
+  .yt-player{aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;display:grid;place-items:center}
+  .yt-wt{font-size:17px;font-weight:600;margin:14px 0 4px}
+  .yt-wc{font-size:12.5px;color:#aaa}
+  .yt-up{margin:22px 0 8px;font-size:13px;color:#ccc;font-weight:600}
+  .yt-uplist{display:flex;flex-direction:column;gap:10px;padding-bottom:10px}
+  .yt-uprow{display:flex;gap:10px;cursor:default}
+  .yt-uprow:hover{background:#1c1c1c;border-radius:8px}
+  .yt-uprow .th{position:relative;width:120px;height:68px;border-radius:8px;flex:0 0 auto;overflow:hidden;background:linear-gradient(135deg,#3a1c71,#cc2b5e)}
+  .yt-uprow .th .ph{position:absolute;inset:0;display:grid;place-items:center;font-size:20px;color:rgba(255,255,255,.9)}
+  .yt-uprow .th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .yt-uprow .m{font-size:12.5px;padding:2px 0}
+  .yt-uprow .m small{color:#aaa;display:block;margin-top:3px;font-size:11px}
+
   /* malware overlays */
   #heat{position:fixed;inset:0;z-index:7000;pointer-events:none;display:none;
     box-shadow:inset 0 0 160px 40px rgba(200,40,10,.32);animation:heatpulse 2.6s ease-in-out infinite}
@@ -687,6 +718,7 @@ const APPS = {
   media:     {title:"Media Player",  icon:"🎞️", w:720, h:520, build:buildMedia},
   recycle:   {title:"Recycle Bin",   icon:"🗑️", w:560, h:420, build:buildRecycle},
   defender:  {title:"Cork Defender", icon:"🛡️", w:620, h:540, build:buildDefender},
+  youtube:   {title:"YouTube",       icon:"▶️", w:860, h:600, build:buildYoutube},
   paint:     {title:"Paint",         icon:"🎨", w:720, h:560, build:buildPaint},
   taskmgr:   {title:"Task Manager",  icon:"📊", w:640, h:520, build:buildTaskmgr},
   mines:     {title:"Minesweeper",   icon:"💣", w:400, h:480, build:buildMines},
@@ -701,6 +733,7 @@ const DESKTOP_ICONS = [
   {app:"explorer", label:"This PC"},
   {app:"edge",     label:"Microsoft Edge"},
   {app:"defender", label:"Cork Defender"},
+  {app:"youtube",  label:"YouTube"},
   {app:"paint",    label:"Paint"},
   {app:"taskmgr",  label:"Task Manager"},
   {app:"mines",    label:"Minesweeper"},
@@ -2652,6 +2685,92 @@ function buildHtmlView(body,win){
   }
   HV.loader=load;
   if(HV_PENDING){ load(HV_PENDING); HV_PENDING=null; } else body.innerHTML=`<div style="padding:20px;color:#888">Open an .html file from File Explorer.</div>`;
+}
+
+/* ---- YouTube (official privacy embed; the ONLY network egress, and only after you press play) ---- */
+// Well-known, embeddable public videos. Swap any ID here if one shows "unavailable" after deploy.
+const YT_PICKS=[
+  {id:"jNQXAC9IVRw",title:"Me at the zoo",chan:"jawed · the first YouTube video"},
+  {id:"aqz-KE-bpKQ",title:"Big Buck Bunny",chan:"Blender Foundation · open movie (CC)"},
+  {id:"dQw4w9WgXcQ",title:"Rick Astley – Never Gonna Give You Up",chan:"Rick Astley"},
+  {id:"9bZkp7q19f0",title:"PSY – Gangnam Style",chan:"officialpsy"},
+  {id:"kJQP7kiw5Fk",title:"Luis Fonsi – Despacito ft. Daddy Yankee",chan:"Luis Fonsi"},
+  {id:"RgKAFK5djSk",title:"Wiz Khalifa – See You Again ft. Charlie Puth",chan:"Wiz Khalifa"},
+  {id:"OPf0YbXqDm0",title:"Mark Ronson – Uptown Funk ft. Bruno Mars",chan:"Mark Ronson"},
+  {id:"JGwWNGJdvx8",title:"Ed Sheeran – Shape of You",chan:"Ed Sheeran"},
+  {id:"fJ9rUzIMcZQ",title:"Queen – Bohemian Rhapsody",chan:"Queen Official"},
+  {id:"60ItHLz5WEA",title:"Alan Walker – Faded",chan:"Alan Walker"},
+];
+let YT_RECENT=[];
+function ytParseId(s){
+  s=(s||"").trim();
+  if(/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+  let m=s.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if(m) return m[1];
+  m=s.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  return m?m[1]:null;
+}
+function ytThumb(box,id){
+  if(!/^[a-zA-Z0-9_-]{11}$/.test(id)) return; // only validated IDs ever hit the network
+  const img=document.createElement("img");
+  img.loading="lazy"; img.alt="";
+  img.referrerPolicy="strict-origin-when-cross-origin";
+  img.onerror=()=>img.remove();               // fall back to the ▶ placeholder
+  img.src=`https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+  box.appendChild(img);
+}
+function buildYoutube(body,win){
+  function bar(){ return `<span class="yt-logo">▶️ <b>YouTube</b></span><input class="yt-search" placeholder="Paste a YouTube link or 11-char video ID"><button class="yt-open">Watch</button>`; }
+  function wire(){
+    const s=body.querySelector(".yt-search"), b=body.querySelector(".yt-open");
+    const go=()=>{ const id=ytParseId(s.value); if(!id){ winDialog({icon:"▶️",title:"YouTube",msg:"Couldn't find a video ID. Paste a full YouTube link (youtube.com/watch?v=… or youtu.be/…) or an 11-character ID."}); return; } watch({id,title:"YouTube video",chan:"YouTube"}); };
+    b.onclick=go; s.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+    const bk=body.querySelector(".yt-back"); if(bk) bk.onclick=home;
+  }
+  function home(){
+    win.querySelector(".tt").textContent="YouTube";
+    const cards=[...YT_RECENT,...YT_PICKS];
+    body.innerHTML=`<div class="yt">
+      <div class="yt-bar">${bar()}</div>
+      <div class="yt-grid"></div>
+      <div class="yt-note">▶ Real YouTube via its official privacy embed (youtube-nocookie.com); thumbnails from i.ytimg.com. YouTube is the only part of WinClone that touches the internet — everything else stays on your PC. Paste any link/ID above to watch more.</div>
+    </div>`;
+    const grid=body.querySelector(".yt-grid");
+    cards.forEach(v=>{
+      const card=el("div","yt-card");
+      card.innerHTML=`<div class="yt-thumb"><span class="ph">▶</span></div><div class="yt-meta"><div class="yt-t">${esc(v.title)}</div><div class="yt-c">${esc(v.chan||"YouTube")}</div></div>`;
+      ytThumb(card.querySelector(".yt-thumb"), v.id);
+      card.onclick=()=>watch(v);
+      grid.appendChild(card);
+    });
+    wire();
+  }
+  function watch(v){
+    if(!/^[a-zA-Z0-9_-]{11}$/.test(v.id)){ home(); return; }
+    if(!YT_RECENT.some(x=>x.id===v.id)) YT_RECENT.unshift({id:v.id,title:v.title||"YouTube video",chan:v.chan||"YouTube"});
+    win.querySelector(".tt").textContent=(v.title||"YouTube")+" — YouTube";
+    body.innerHTML=`<div class="yt">
+      <div class="yt-bar"><button class="yt-back">←</button>${bar()}</div>
+      <div class="yt-watch"><div class="yt-player"></div>
+        <div class="yt-wt">${esc(v.title||"YouTube video")}</div><div class="yt-wc">${esc(v.chan||"YouTube")}</div>
+        <div class="yt-up">More</div><div class="yt-uplist"></div></div></div>`;
+    const player=body.querySelector(".yt-player");
+    const f=document.createElement("iframe");
+    f.src=`https://www.youtube-nocookie.com/embed/${v.id}?rel=0&modestbranding=1`;
+    f.allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+    f.allowFullscreen=true; f.referrerPolicy="strict-origin-when-cross-origin";
+    f.style.cssText="width:100%;height:100%;border:0";
+    player.appendChild(f);
+    const up=body.querySelector(".yt-uplist");
+    [...YT_RECENT,...YT_PICKS].filter(x=>x.id!==v.id).slice(0,8).forEach(x=>{
+      const r=el("div","yt-uprow");
+      r.innerHTML=`<div class="th"><span class="ph">▶</span></div><div class="m">${esc(x.title)}<small>${esc(x.chan||"YouTube")}</small></div>`;
+      ytThumb(r.querySelector(".th"), x.id);
+      r.onclick=()=>watch(x); up.appendChild(r);
+    });
+    wire();
+  }
+  home();
 }
 
 /* ============================ WI-FI ============================ */
