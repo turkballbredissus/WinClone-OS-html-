@@ -262,8 +262,43 @@
   .toggle.on::after{left:23px}
   .swatches{display:flex;gap:8px}
   .sw{width:26px;height:26px;border-radius:50%;cursor:default;border:2px solid transparent}
-  .sw.sel{border-color:#fff}
+  .sw.big{width:30px;height:30px}
+  .sw.sel{border-color:#fff;box-shadow:0 0 0 2px var(--accent-solid)}
+  .wp-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:10px}
+  .wp-swatch{height:56px;border-radius:8px;border:2px solid transparent;cursor:default;position:relative;overflow:hidden}
+  .wp-swatch.sel{border-color:#fff;box-shadow:0 0 0 2px var(--accent-solid)}
+  .wp-swatch .wl{position:absolute;left:0;right:0;bottom:0;font-size:10px;background:rgba(0,0,0,.45);color:#fff;padding:2px 5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acct-hero{display:flex;align-items:center;gap:16px;margin-bottom:4px}
+  .acct-av{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-solid));display:grid;place-items:center;font-size:26px;font-weight:600;color:#fff;flex:0 0 auto}
+  .st-input{height:34px;border-radius:6px;border:1px solid var(--stroke);background:#1a1a1a;color:#fff;padding:0 12px;font-size:13px;outline:none;width:240px;max-width:60%}
+  .st-btn{border:1px solid var(--stroke);background:#333;color:#fff;border-radius:5px;padding:8px 16px;font-size:12.5px;cursor:default}
+  .st-btn:hover{background:#3d3d3d}
+  .st-btn.pri{background:var(--accent-solid);border-color:transparent}
+  .is-lnk .gl{position:relative}
+  .is-lnk .gl::after{content:"↗";position:absolute;left:-3px;bottom:-3px;font-size:11px;font-weight:700;color:#e8e8e8;background:rgba(28,28,30,.92);border-radius:3px;width:15px;height:15px;line-height:15px;text-align:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
 
+  /* WinClone Docs (Google-Docs-style editor) */
+  .docs{display:flex;flex-direction:column;height:100%;background:#f6f8fc;color:#202124}
+  .docs-head{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#fff;border-bottom:1px solid #e3e6ea;flex:0 0 auto}
+  .docs-head .ic{font-size:22px}
+  .docs-title{border:1px solid transparent;border-radius:5px;font-size:15px;color:#202124;padding:5px 8px;background:transparent;outline:none;min-width:120px;max-width:320px;font-family:inherit}
+  .docs-title:hover{border-color:#dadce0}
+  .docs-title:focus{border-color:#1a73e8;background:#fff}
+  .docs-status{font-size:12px;color:#5f6368;margin-left:auto;white-space:nowrap}
+  .docs-tools{display:flex;align-items:center;gap:2px;flex-wrap:wrap;padding:5px 12px;background:#fff;border-bottom:1px solid #e3e6ea;flex:0 0 auto}
+  .docs-tool{min-width:30px;height:30px;border:0;background:transparent;border-radius:5px;color:#3c4043;font-size:14px;cursor:default;display:grid;place-items:center;padding:0 6px}
+  .docs-tool:hover{background:#f1f3f4}
+  .docs-tool.on{background:#d2e3fc;color:#1967d2}
+  .docs-sep{width:1px;height:20px;background:#e3e6ea;margin:0 5px}
+  .docs-sel{height:30px;border:1px solid #dadce0;border-radius:5px;background:#fff;color:#3c4043;font-size:12.5px;padding:0 4px;outline:none;cursor:default;font-family:inherit}
+  .docs-canvas{flex:1;overflow:auto;padding:26px 10px;display:flex;justify-content:center}
+  .docs-page{background:#fff;width:min(720px,100%);min-height:calc(100% - 0px);box-shadow:0 1px 5px rgba(0,0,0,.16);border:1px solid #e3e6ea;padding:60px 72px;font-size:15px;line-height:1.65;color:#202124;outline:none}
+  .docs-page:empty:before{content:"Start typing…";color:#9aa0a6}
+  .docs-page h1{font-size:26px;margin:.4em 0}.docs-page h2{font-size:21px;margin:.4em 0}.docs-page h3{font-size:17px;margin:.4em 0}
+  .docs-page p{margin:0 0 .55em}
+  .docs-page ul,.docs-page ol{margin:.2em 0 .6em;padding-left:26px}
+  .docs-color{position:relative;overflow:hidden}
+  .docs-color input[type=color]{position:absolute;inset:0;opacity:0;cursor:default}
   .edge{display:flex;flex-direction:column;height:100%;background:#f3f3f3}
   .edge-bar{height:46px;flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 12px;background:#dfe3e8}
   .edge-nav{width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:#333;font-size:15px;cursor:default}
@@ -725,6 +760,7 @@
 const APPS = {
   explorer:  {title:"File Explorer", icon:"📁", w:760, h:500, build:buildExplorer},
   notepad:   {title:"Notepad",       icon:"📝", w:600, h:440, build:buildNotepad},
+  docs:      {title:"WinClone Docs", icon:"📘", w:860, h:620, build:buildDocs},
   calc:      {title:"Calculator",    icon:"🧮", w:340, h:500, build:buildCalc},
   terminal:  {title:"Terminal",      icon:"🖥️", w:660, h:420, build:buildTerminal},
   settings:  {title:"Settings",      icon:"⚙️", w:780, h:540, build:buildSettings},
@@ -741,7 +777,7 @@ const APPS = {
   archive:   {title:"Archive",       icon:"🗜️", w:560, h:420, build:buildArchive, hidden:true},
   htmlview:  {title:"HTML Viewer",   icon:"🌐", w:760, h:560, build:buildHtmlView, hidden:true},
 };
-const PINNED = ["edge","explorer","notepad","calc","photos","settings","terminal","defender","recycle"];
+const PINNED = ["edge","explorer","notepad","docs","calc","photos","settings","terminal","defender","recycle"];
 const TASKBAR_PINS = ["explorer","edge","notepad","terminal"];
 const DESKTOP_ICONS = [
   {app:"recycle",  label:"Recycle Bin"},
@@ -971,9 +1007,8 @@ function renderDesktopIcons(){
   const dt=nodeAt(dpath);
   if(dt&&dt.children) Object.keys(dt.children).forEach(name=>{
     const item=dt.children[name];
-    const glyph=item.folder?"📁":(item.archive?"🗜️":(item.icon||"📄"));
-    const i=el("div","dicon");
-    i.innerHTML=`<div class="gl">${glyph}</div><div class="lbl">${esc(name)}</div>`;
+    const i=el("div","dicon"+(isLnk(name,item)?" is-lnk":""));
+    i.innerHTML=`<div class="gl">${glyphFor(name,item)}</div><div class="lbl">${esc(name)}</div>`;
     i.onclick=sel;
     i.ondblclick=()=>fsOpen(dpath,name,item);
     i.oncontextmenu=e=>{ e.preventDefault(); e.stopPropagation(); fsItemMenu(e.clientX,e.clientY,dpath,name,item); };
@@ -991,6 +1026,8 @@ function renderStartGrid(filter){
       const a=el("div","sm-app");
       a.innerHTML=`<span class="gl">${APPS[id].icon}</span><span class="nm">${APPS[id].title}</span>`;
       a.onclick=()=>{ closeFlyouts(); openApp(id); };
+      a.oncontextmenu=e=>{ e.preventDefault(); e.stopPropagation();
+        showCtx(e.clientX,e.clientY,[{icon:"🖥️",label:"Add to desktop",action:()=>{ addAppShortcutToDesktop(id); closeFlyouts(); }}]); };
       g.appendChild(a);
     });
 }
@@ -1052,7 +1089,7 @@ document.addEventListener("contextmenu", e=>{
   if(CLIP) menu.push({icon:"📋",label:"Paste",action:()=>clipPaste(dpath)});
   menu.push("sep",
     {icon:"🖥️",label:"Display settings", action:()=>openApp("settings")},
-    {icon:"🎨",label:"Personalize", action:()=>openApp("settings")},
+    {icon:"🎨",label:"Personalize", action:()=>{ SETTINGS_PENDING="personal"; openApp("settings"); }},
     "sep",
     {icon:"🖥️",label:"Open Terminal", action:()=>openApp("terminal")});
   showCtx(e.clientX,e.clientY,menu);
@@ -1162,6 +1199,131 @@ function buildNotepad(body, win){
   if(NP_PENDING){ load(NP_PENDING); NP_PENDING=null; } else setTitle();
 }
 
+/* ---- WinClone Docs: a Google-Docs-style rich text editor ---- */
+let DOC_PENDING=null; const DOC={loader:null};
+function openDocs(pn){
+  if(state.wins.docs && DOC.loader){ if(state.wins.docs.min) toggleMin("docs",false); focusWin("docs"); DOC.loader(pn); }
+  else { DOC_PENDING=pn; openApp("docs"); }
+}
+function docTextToHtml(t){
+  if(!t) return "<p><br></p>";
+  return t.split(/\n{2,}/).map(p=>"<p>"+esc(p).replace(/\n/g,"<br>")+"</p>").join("");
+}
+function buildDocs(body,win){
+  body.innerHTML=`<div class="docs">
+    <div class="docs-head">
+      <span class="ic">📘</span>
+      <input class="docs-title" value="Untitled document" spellcheck="false">
+      <span class="docs-status" data-status>All changes saved</span>
+    </div>
+    <div class="docs-tools">
+      <button class="docs-tool" data-c="undo" title="Undo">↶</button>
+      <button class="docs-tool" data-c="redo" title="Redo">↷</button>
+      <span class="docs-sep"></span>
+      <select class="docs-sel" data-block title="Paragraph style">
+        <option value="P">Normal text</option>
+        <option value="H1">Title</option>
+        <option value="H2">Heading</option>
+        <option value="H3">Subheading</option>
+      </select>
+      <select class="docs-sel" data-size title="Font size">
+        <option value="2">Small</option>
+        <option value="3" selected>Normal</option>
+        <option value="5">Large</option>
+        <option value="6">Huge</option>
+      </select>
+      <span class="docs-sep"></span>
+      <button class="docs-tool" data-c="bold" title="Bold"><b>B</b></button>
+      <button class="docs-tool" data-c="italic" title="Italic"><i>I</i></button>
+      <button class="docs-tool" data-c="underline" title="Underline"><u>U</u></button>
+      <button class="docs-tool" data-c="strikeThrough" title="Strikethrough"><s>S</s></button>
+      <label class="docs-tool docs-color" title="Text color"><span data-fc style="color:#1a73e8;font-weight:700">A</span><input type="color" data-color value="#1a73e8"></label>
+      <span class="docs-sep"></span>
+      <button class="docs-tool" data-c="justifyLeft" title="Align left">☰</button>
+      <button class="docs-tool" data-c="justifyCenter" title="Center">≣</button>
+      <button class="docs-tool" data-c="justifyRight" title="Align right">☰</button>
+      <span class="docs-sep"></span>
+      <button class="docs-tool" data-c="insertUnorderedList" title="Bulleted list">•</button>
+      <button class="docs-tool" data-c="insertOrderedList" title="Numbered list">1.</button>
+      <button class="docs-tool" data-c="removeFormat" title="Clear formatting">✕</button>
+    </div>
+    <div class="docs-canvas"><div class="docs-page" contenteditable="true" spellcheck="false"></div></div>
+  </div>`;
+  const page=body.querySelector(".docs-page");
+  const titleI=body.querySelector(".docs-title");
+  const status=body.querySelector("[data-status]");
+  let cur=null, saveT=null, savedRange=null;
+  const baseTitle=()=>(titleI.value.trim()||"Untitled document");
+  const setTitle=()=>{ win.querySelector(".tt").textContent=baseTitle()+" — Docs"; };
+  const setStatus=t=>{ status.textContent=t; };
+
+  page.addEventListener("blur",()=>{ const s=getSelection(); if(s.rangeCount && page.contains(s.anchorNode)) savedRange=s.getRangeAt(0).cloneRange(); });
+  function withSel(fn){ page.focus(); if(savedRange){ const s=getSelection(); s.removeAllRanges(); s.addRange(savedRange); } fn(); scheduleSave(); syncToolbar(); }
+  function cmd(c){ withSel(()=>document.execCommand(c,false,null)); }
+
+  function ensureFile(){
+    if(cur) return true;
+    const folder=nodeAt([...HOME_PATH,"Documents"])||nodeAt(HOME_PATH);
+    if(!folder||!folder.children) return false;
+    const nm=uniqueName(folder, baseTitle()+".docx");
+    folder.children[nm]={icon:"📘",doc:true,html:page.innerHTML,content:page.innerText};
+    cur={path:nodeAt([...HOME_PATH,"Documents"])?[...HOME_PATH,"Documents"]:[...HOME_PATH],name:nm};
+    return true;
+  }
+  function save(){
+    if(!ensureFile()){ setStatus("Couldn't save"); return; }
+    const parent=nodeAt(cur.path), ex=parent&&parent.children[cur.name];
+    if(!parent||!parent.children||(ex&&ex.folder)){ setStatus("Couldn't save"); return; }
+    parent.children[cur.name]=Object.assign(ex||{icon:"📘"},{doc:true,html:page.innerHTML,content:page.innerText});
+    saveFS(); refreshFX(); setStatus("All changes saved");
+  }
+  function scheduleSave(){ setStatus("Saving…"); clearTimeout(saveT); saveT=setTimeout(save,600); }
+
+  function load(pn){
+    const parent=nodeAt(pn.path), f=parent&&parent.children[pn.name];
+    if(!f){ winDialog({icon:"❌",title:"Docs",msg:"File not found."}); return; }
+    page.innerHTML=f.html||docTextToHtml(f.content||"");
+    titleI.value=pn.name.replace(/\.[^.]+$/,"");
+    cur={path:[...pn.path],name:pn.name}; setTitle(); setStatus("All changes saved");
+  }
+  DOC.loader=load;
+
+  titleI.addEventListener("change",()=>{
+    setTitle();
+    if(cur){
+      const parent=nodeAt(cur.path);
+      if(parent&&parent.children){
+        let nn=baseTitle()+".docx";
+        if(nn!==cur.name){ if(parent.children[nn]) nn=uniqueName(parent,nn); parent.children[nn]=parent.children[cur.name]; delete parent.children[cur.name]; cur.name=nn; saveFS(); refreshFX(); }
+      }
+    }
+    setStatus("All changes saved");
+  });
+
+  page.addEventListener("input",scheduleSave);
+  page.addEventListener("keyup",syncToolbar);
+  page.addEventListener("mouseup",syncToolbar);
+
+  body.querySelectorAll("[data-c]").forEach(b=>{
+    b.addEventListener("mousedown",e=>e.preventDefault());
+    b.onclick=()=>cmd(b.dataset.c);
+  });
+  body.querySelector("[data-block]").onchange=e=>withSel(()=>document.execCommand("formatBlock",false,e.target.value));
+  body.querySelector("[data-size]").onchange=e=>withSel(()=>document.execCommand("fontSize",false,e.target.value));
+  const colorI=body.querySelector("[data-color]");
+  colorI.oninput=()=>{ withSel(()=>document.execCommand("foreColor",false,colorI.value)); body.querySelector("[data-fc]").style.color=colorI.value; };
+
+  function syncToolbar(){
+    try{
+      ["bold","italic","underline","strikeThrough","justifyLeft","justifyCenter","justifyRight","insertUnorderedList","insertOrderedList"]
+        .forEach(c=>{ const b=body.querySelector('[data-c="'+c+'"]'); if(b) b.classList.toggle("on",document.queryCommandState(c)); });
+    }catch(e){}
+  }
+
+  if(DOC_PENDING){ load(DOC_PENDING); DOC_PENDING=null; }
+  else { page.innerHTML="<p><br></p>"; setTitle(); }
+}
+
 function buildCalc(body){
   body.innerHTML = `<div class="calc">
     <div class="calc-disp"><div class="expr"></div><div class="val">0</div></div>
@@ -1257,7 +1419,7 @@ function defaultFS(){ return {
     "Users":{folder:true,children:{
       "User":{folder:true,children:{
         "Desktop":{folder:true,children:{
-          "WinClone.lnk":{icon:"🪟"},
+          "WinClone.lnk":{icon:"🪟",lnk:true,target:"settings"},
           "notes.txt":{icon:"📄",content:"my secret plans:\n- build a pc\n- do NOT delete systemwinclone.sys\n- take over the world (later)"}}},
         "Documents":{folder:true,children:{
           "resume.docx":{icon:"📘",content:"USER — RESUME\n\nSkills: building an operating system out of one HTML file."},
@@ -1305,19 +1467,95 @@ INFECTIONS=(INFECTIONS||[]).map(x=>typeof x==="string"?{name:x,kind:"scareware"}
 
 const HOME_PATH=["C:","Users","User"];
 function nodeAt(path){ let n={folder:true,children:VFS}; for(const k of path){ if(!n.children||!n.children[k]) return null; n=n.children[k]; } return n; }
+/* migrate a legacy WinClone.lnk (created before shortcuts worked) into a real shortcut */
+try{ const _d=nodeAt(["C:","Users","User","Desktop"]), _w=_d&&_d.children&&_d.children["WinClone.lnk"];
+  if(_w && !_w.target && !_w.path){ _w.lnk=true; _w.target="settings"; saveFS(); } }catch(e){}
 
 /* open explorer windows re-render when the FS changes */
 const fxRefreshers=[];
 function refreshFX(){ fxRefreshers.forEach(f=>{try{f()}catch(e){}}); try{renderDesktopIcons();}catch(e){} }
+
+/* ---- account / username ---- */
+function getUser(){ const n=localStorage.getItem("wc_user"); return (n&&n.trim())||"User"; }
+function userInitial(){ return (getUser().trim()[0]||"U").toUpperCase(); }
+function userEmail(){ return getUser().trim().toLowerCase().replace(/[^a-z0-9]+/g,".").replace(/^\.+|\.+$/g,"")+"@winclone.local"; }
+function setUser(name){
+  name=(name||"").trim().slice(0,24);
+  try{ if(name) localStorage.setItem("wc_user",name); else localStorage.removeItem("wc_user"); }catch(e){}
+  applyUserUI();
+}
+function applyUserUI(){
+  const n=getUser(), i=userInitial();
+  document.querySelectorAll("#startfoot .sm-user span").forEach(e=>e.textContent=n);
+  document.querySelectorAll("#startfoot .avatar, #login .avatar-lg").forEach(e=>e.textContent=i);
+  document.querySelectorAll("#login .lg-name").forEach(e=>e.textContent=n);
+}
+
+/* ---- theme / accent (persisted) ---- */
+function setAccent(a,solid){
+  document.documentElement.style.setProperty("--accent",a);
+  if(solid) document.documentElement.style.setProperty("--accent-solid",solid);
+  try{ localStorage.setItem("wc_accent",a+"|"+(solid||"")); }catch(e){}
+}
+
+/* ---- file-type glyphs ---- */
+const EXT_GLYPH={
+  txt:"📄",log:"📄",md:"📝",rtf:"📃",ini:"🧾",cfg:"🧾",conf:"🧾",json:"🗂️",xml:"🗂️",yml:"🗂️",yaml:"🗂️",
+  csv:"📊",tsv:"📊",xlsx:"📗",xls:"📗",docx:"📘",doc:"📘",pptx:"📙",ppt:"📙",pdf:"📕",
+  png:"🖼️",jpg:"🖼️",jpeg:"🖼️",gif:"🖼️",bmp:"🖼️",webp:"🖼️",svg:"🖼️",ico:"🖼️",
+  mp4:"🎬",webm:"🎬",mkv:"🎬",avi:"🎬",mov:"🎬",m4v:"🎬",
+  mp3:"🎵",wav:"🎵",ogg:"🎵",m4a:"🎵",flac:"🎵",
+  zip:"🗜️",rar:"🗜️","7z":"🗜️",tar:"🗜️",gz:"🗜️",
+  exe:"⚙️",msi:"⚙️",scr:"⚙️",bat:"📜",ps1:"📜",sh:"📜",dll:"🧩",sys:"⚙️",
+  html:"🌐",htm:"🌐",css:"🎨",js:"📜",ts:"📜",py:"🐍",lnk:"🔗",ttf:"🔤",otf:"🔤",
+};
+function extOf(name){ const m=/\.([a-z0-9]+)$/i.exec(name||""); return m?m[1].toLowerCase():""; }
+function glyphFor(name,item){
+  if(item&&item.folder) return "📁";
+  if(item&&item.archive) return "🗜️";
+  if(item&&item.icon) return item.icon;
+  return EXT_GLYPH[extOf(name)] || "📄";
+}
+
+/* ---- shortcuts (.lnk) ---- */
+function isLnk(name,item){ return !!(item&&item.lnk) || /\.lnk$/i.test(name||""); }
+function openShortcut(name,item){
+  if(item.target && APPS[item.target]){ openApp(item.target); return; }
+  if(item.path && item.path.length){
+    const node=nodeAt(item.path);
+    if(!node){ winDialog({icon:"⚠️",title:name,msg:"The item this shortcut points to can't be found.<br><small style='color:#9a9a9a'>It may have been moved, renamed or deleted.</small>"}); return; }
+    if(node.folder){ openExplorerAt(item.path); }
+    else fsOpen(item.path.slice(0,-1), item.path[item.path.length-1], node);
+    return;
+  }
+  winDialog({icon:"🔗",title:name,msg:"This shortcut doesn't point to anything."});
+}
+function createShortcut(srcPath,name,item,destPath){
+  const dest=nodeAt(destPath); if(!dest||!dest.children) return;
+  const base=name.replace(/\.[^.]+$/,"")+" - Shortcut.lnk";
+  dest.children[uniqueName(dest,base)]={lnk:true, icon:glyphFor(name,item), path:[...srcPath,name]};
+  saveFS(); refreshFX();
+}
+function addAppShortcutToDesktop(appId){
+  const app=APPS[appId]; if(!app) return;
+  const desk=nodeAt([...HOME_PATH,"Desktop"]); if(!desk||!desk.children) return;
+  desk.children[uniqueName(desk, app.title+".lnk")]={lnk:true, icon:app.icon, target:appId};
+  saveFS(); refreshFX();
+}
 
 /* ---- New-file templates ---- */
 const NEW_TYPES=[
   {label:"Folder",              icon:"📁", base:"New folder",                 make:()=>({folder:true,children:{}})},
   {label:"Text Document",       icon:"📄", base:"New Text Document.txt",      make:()=>({icon:"📄",content:""})},
   {label:"HTML Document",       icon:"🌐", base:"New HTML Document.html",     make:()=>({icon:"🌐",content:"<!doctype html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>New Page</title>\n  <style>body{font-family:Segoe UI,sans-serif;padding:30px;color:#222}h1{color:#0067c0}</style>\n</head>\n<body>\n  <h1>Hello from WinClone</h1>\n  <p>Edit me in Notepad, then double-click to render.</p>\n</body>\n</html>"})},
+  {label:"Word Document",       icon:"📘", base:"New Document.docx",          make:()=>({icon:"📘",doc:true,html:"<p><br></p>",content:""})},
   {label:"Rich Text Document",  icon:"📃", base:"New Rich Text Document.rtf", make:()=>({icon:"📃",content:""})},
   {label:"Spreadsheet (CSV)",   icon:"📊", base:"New Spreadsheet.csv",        make:()=>({icon:"📊",content:"name,value\n,"})},
   {label:"Config (INI)",        icon:"🧾", base:"New Config.ini",             make:()=>({icon:"🧾",content:"[settings]\n"})},
+  {label:"Markdown Document",   icon:"📝", base:"New Markdown.md",            make:()=>({icon:"📝",content:"# Title\n\n"})},
+  {label:"JSON File",           icon:"🗂️", base:"New File.json",              make:()=>({icon:"🗂️",content:"{\n  \n}"})},
+  {label:"Log File",            icon:"📄", base:"New Log File.log",           make:()=>({icon:"📄",content:""})},
+  {label:"Batch Script",        icon:"📜", base:"New Batch Script.bat",       make:()=>({icon:"📜",content:"@echo off\n"})},
   {label:"Bitmap Image",        icon:"🖼️", base:"New Bitmap Image.bmp",       make:()=>({icon:"🖼️"})},
   {label:"ZIP Archive",         icon:"🗜️", base:"New Archive.zip",            make:()=>({icon:"🗜️",archive:true,children:{}})},
   {label:"RAR Archive",         icon:"🗜️", base:"New Archive.rar",            make:()=>({icon:"🗜️",archive:true,children:{}})},
@@ -1414,11 +1652,13 @@ function renameItem(path,name,item){
 /* ---- universal open router ---- */
 function fsOpen(path,name,item){
   if(item.locked){ winDialog({icon:"🔒",title:name,msg:"This file is encrypted by BitCork ransomware and can't be opened. Run <b>Cork Defender</b> to decrypt it."}); return; }
+  if(isLnk(name,item)){ openShortcut(name,item); return; }
   if(item.archive){ openArchive({path:[...path],name}); return; }
   if(item.folder){ openExplorerAt([...path,name]); return; }
   const lo=name.toLowerCase();
-  const isImg=/\.(png|jpe?g|gif|bmp|webp)$/.test(lo);
+  const isImg=/\.(png|jpe?g|gif|bmp|webp|svg|ico)$/.test(lo);
   const isVid=/\.(mp4|webm|mkv|avi|mov|m4v)$/.test(lo);
+  const isAud=/\.(mp3|wav|ogg|m4a|flac)$/.test(lo);
   // Files pulled off the real web are inert: only images and videos may open.
   if(item.web && !isImg && !isVid){
     winDialog({icon:"🚫",title:name,msg:`<b>${esc(name)}</b> was downloaded from the internet.<br>WinClone won't run files from the web — only images and videos will open.`});
@@ -1426,9 +1666,10 @@ function fsOpen(path,name,item){
   }
   if(/\.html?$/.test(lo)) openHtml({path:[...path],name});
   else if(isImg) openImageInPhotos({path:[...path],name});
-  else if(isVid || /\.(mp3|wav)$/.test(lo)) openMediaIn({path:[...path],name});
+  else if(isVid || isAud) openMediaIn({path:[...path],name});
+  else if(/\.(docx?|odt|rtf|wcdoc)$/.test(lo)) openDocs({path:[...path],name});
   else if(item.exe||item.malware||lo.endsWith(".exe")) runFile(name,item);
-  else openFileInNotepad({path:[...path],name}); // txt, rtf, csv, ini, log, unknown-with-content
+  else openFileInNotepad({path:[...path],name}); // txt, md, json, log, rtf, csv, ini, bat, unknown-with-content
 }
 /* context menu for a file/folder, reused by Explorer + Desktop */
 function fsItemMenu(x,y,path,name,item,extra){
@@ -1436,11 +1677,16 @@ function fsItemMenu(x,y,path,name,item,extra){
   if(/\.(png|jpe?g|gif|bmp)$/i.test(name) && !item.locked)
     items.push({icon:"🖼️",label:"Set as wallpaper",action:()=>setWallpaper(artFor(name,item).g)});
   if(item.archive) items.push({icon:"📦",label:"Extract all here",action:()=>extractArchive(path,name,item)});
+  if(!isLnk(name,item)){
+    items.push({icon:"🔗",label:"Create shortcut",action:()=>createShortcut(path,name,item,path)});
+    if(path.join("/")!==[...HOME_PATH,"Desktop"].join("/"))
+      items.push({icon:"🖥️",label:"Send to Desktop",action:()=>createShortcut(path,name,item,[...HOME_PATH,"Desktop"])});
+  }
   items.push("sep",
     {icon:"✂️",label:"Cut",action:()=>clipCut(path,name,item)},
     {icon:"📋",label:"Copy",action:()=>clipCopy(path,name,item)},
     {icon:"✏️",label:"Rename",action:()=>renameItem(path,name,item)});
-  if(!item.folder && !item.archive && !item.sys)
+  if(!item.folder && !item.archive && !item.sys && !isLnk(name,item))
     items.push({icon:"🗜️",label:"Compress to ZIP",action:()=>compressToArchive(path,name,item)});
   items.push("sep",{icon:"🗑️",label:"Delete",action:()=>(extra&&extra.del?extra.del():deleteAt(path,name))});
   showCtx(x,y,items);
@@ -1852,7 +2098,7 @@ function allImages(){
     Object.keys(kids).forEach(k=>{
       const it=kids[k];
       if(it.folder) walk(it,[...path,k]);
-      else if(/\.(png|jpe?g|gif|bmp|webp)$/i.test(k)) out.push({name:k,path:[...path],item:it});
+      else if(/\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(k)) out.push({name:k,path:[...path],item:it});
     });
   })({children:VFS},[]);
   return out;
@@ -1958,9 +2204,8 @@ function buildExplorer(body){
     if(Object.keys(kids).length===0){ grid.innerHTML=`<div style="color:#888;padding:20px">This folder is empty. Right-click to create something.</div>`; return; }
     Object.keys(kids).forEach(name=>{
       const item=kids[name];
-      const glyph=item.folder?"📁":(item.archive?"🗜️":(item.icon||"📄"));
-      const t=el("div","fx-tile");
-      t.innerHTML=`<span class="gl">${glyph}</span><span class="nm">${esc(name)}</span>`;
+      const t=el("div","fx-tile"+(isLnk(name,item)?" is-lnk":""));
+      t.innerHTML=`<span class="gl">${glyphFor(name,item)}</span><span class="nm">${esc(name)}</span>`;
       t.onclick=e=>{ e.stopPropagation(); grid.querySelectorAll(".sel").forEach(x=>x.classList.remove("sel")); t.classList.add("sel"); };
       t.ondblclick=()=>openItem(name,item);
       t.oncontextmenu=e=>{ e.preventDefault(); e.stopPropagation();
@@ -2028,20 +2273,56 @@ function buildExplorer(body){
   render();
 }
 
+let SETTINGS_PENDING=null;
+const SETTINGS_ACCENTS=[["#4cc2ff","#0067c0"],["#5cd68a","#107c41"],["#ff8c42","#c4501a"],["#c58af9","#8a3ffc"],["#ff6b81","#c42b4a"],["#ffd166","#c79100"],["#38bdf8","#0284c7"],["#f472b6","#be185d"],["#818cf8","#4338ca"],["#a3a3a3","#525252"]];
+const SETTINGS_SOLIDS=["#0f172a","#1e293b","#312e81","#4c1d95","#7f1d1d","#064e3b","#134e4a","#3f3f46"];
+function pickWallpaperPhoto(){
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*";
+  inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f) return;
+    loadScaledDataURL(f,1920,url=>{ if(url) setWallpaper(`center/cover no-repeat url('${url}')`); else winDialog({icon:"⚠️",title:"Background",msg:"Couldn't load that image."}); }); };
+  inp.click();
+}
 function buildSettings(body){
+  const curAccent=(localStorage.getItem("wc_accent")||"|").split("|")[0]||"#4cc2ff";
+  const curWall=localStorage.getItem("wc_wall")||"";
+  const isDark=()=>$("#desktop").classList.contains("dark");
+  const sw=([a,s])=>`<div class="sw big${a===curAccent?" sel":""}" style="background:${a}" data-a="${a}|${s}"></div>`;
+  const solidCss=c=>`linear-gradient(${c},${c})`;
+  const wc=(g,label)=>`<div class="wp-swatch${curWall===g?" sel":""}" style="background:${g}" data-wall="${esc(g)}"><span class="wl">${esc(label)}</span></div>`;
   const pages = {
     system:`<h2>System</h2>
-      <div class="st-card"><div class="l"><span class="gl">🎨</span><div class="t"><b>Dark mode</b><small>Change the color scheme</small></div></div><div class="toggle ${document.getElementById('desktop').classList.contains('dark')?'on':''}" data-t="theme"></div></div>
-      <div class="st-card"><div class="l"><span class="gl">🎯</span><div class="t"><b>Accent color</b><small>Pick a highlight color</small></div></div>
-        <div class="swatches">
-          <div class="sw" style="background:#4cc2ff" data-a="#4cc2ff|#0067c0"></div>
-          <div class="sw" style="background:#5cd68a" data-a="#5cd68a|#107c41"></div>
-          <div class="sw" style="background:#ff8c42" data-a="#ff8c42|#c4501a"></div>
-          <div class="sw" style="background:#c58af9" data-a="#c58af9|#8a3ffc"></div>
-          <div class="sw" style="background:#ff6b81" data-a="#ff6b81|#c42b4a"></div>
-        </div></div>
-      <div class="st-card"><div class="l"><span class="gl">🖼️</span><div class="t"><b>Wallpaper theme</b><small>Light or dark bloom</small></div></div>
-        <div><button class="allbtn" data-w="dark" style="margin-right:6px">Dark</button><button class="allbtn" data-w="light">Light</button></div></div>`,
+      <div class="st-card"><div class="l"><span class="gl">🎨</span><div class="t"><b>Dark mode</b><small>Change the desktop color scheme</small></div></div><div class="toggle ${isDark()?'on':''}" data-t="theme"></div></div>
+      <div class="st-card"><div class="l"><span class="gl">💾</span><div class="t"><b>Storage</b><small>Local Disk (C:) — 214 GB of 512 GB used</small></div></div></div>
+      <div class="st-card"><div class="l"><span class="gl">🔔</span><div class="t"><b>Notifications</b><small>Notify me from apps and the system</small></div></div><div class="toggle on"></div></div>
+      <div class="st-card"><div class="l"><span class="gl">🔋</span><div class="t"><b>Power &amp; battery</b><small>Balanced — screen off after 10 min</small></div></div></div>`,
+    personal:`<h2>Personalization</h2>
+      <div class="st-card"><div class="l"><span class="gl">🌗</span><div class="t"><b>Dark mode</b><small>Light or dark desktop</small></div></div><div class="toggle ${isDark()?'on':''}" data-t="theme"></div></div>
+      <div class="st-card" style="flex-direction:column;align-items:stretch;gap:12px">
+        <div class="l"><span class="gl">🎯</span><div class="t"><b>Accent color</b><small>Highlights, buttons and the taskbar</small></div></div>
+        <div class="swatches" style="flex-wrap:wrap">${SETTINGS_ACCENTS.map(sw).join("")}</div>
+      </div>
+      <div class="st-card" style="flex-direction:column;align-items:stretch;gap:12px">
+        <div class="l"><span class="gl">🖼️</span><div class="t"><b>Background</b><small>Pick a wallpaper, a solid color, or a photo</small></div></div>
+        <div class="wp-pick">
+          ${WALLPAPERS.map(w=>wc(w.g,w.n)).join("")}
+          ${SETTINGS_SOLIDS.map(c=>wc(solidCss(c),"Solid")).join("")}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="st-btn" data-wdefault>Use default bloom</button>
+          <button class="st-btn" data-wimport>Choose a photo…</button>
+        </div>
+      </div>`,
+    accounts:`<h2>Accounts</h2>
+      <div class="st-card" style="flex-direction:column;align-items:stretch;gap:14px">
+        <div class="acct-hero"><div class="acct-av" data-avatar>${esc(userInitial())}</div>
+          <div><b style="font-size:15px" data-uname>${esc(getUser())}</b><br><small style="color:#9a9a9a" data-umail>${esc(userEmail())}</small></div></div>
+        <div class="t"><b>Your name</b><small style="color:#9a9a9a;display:block;margin-top:2px">Shown on the sign-in screen, the Start menu and here.</small></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="st-input" data-uinput maxlength="24" value="${esc(getUser())}" placeholder="Enter a username" spellcheck="false">
+          <button class="st-btn pri" data-usave>Save</button>
+        </div>
+        <small style="color:#7d7d7d">Stored only in this browser. Leave blank to reset to “User”.</small>
+      </div>`,
     about:`<h2>About</h2>
       <div class="st-card" style="flex-direction:column;align-items:flex-start;gap:6px">
         <div style="font-size:15px"><b>WINCLONE-PC</b></div>
@@ -2063,24 +2344,40 @@ function buildSettings(body){
       <div class="st-card"><div class="l"><span class="gl">📶</span><div class="t"><b>Wi-Fi — HOME-5G</b><small>Connected, secured</small></div></div><div class="toggle on"></div></div>
       <div class="st-card"><div class="l"><span class="gl">✈️</span><div class="t"><b>Airplane mode</b><small>Stop wireless communication</small></div></div><div class="toggle"></div></div>`,
   };
+  const NAV=[["system","🖥️","System"],["personal","🎨","Personalization"],["accounts","👤","Accounts"],["bt","🔵","Bluetooth &amp; devices"],["net","🌐","Network &amp; internet"],["about","ℹ️","About"]];
+  const start=(SETTINGS_PENDING&&pages[SETTINGS_PENDING])?SETTINGS_PENDING:"system"; SETTINGS_PENDING=null;
   body.innerHTML=`<div class="settings">
     <div class="st-side">
-      <div class="st-user"><div class="avatar">U</div><div><b style="font-size:13px">User</b><br><small style="color:#9a9a9a;font-size:11px">user@winclone.local</small></div></div>
-      <div class="st-nav act" style="position:relative" data-p="system"><span class="gl">🖥️</span> System</div>
-      <div class="st-nav" style="position:relative" data-p="bt"><span class="gl">🔵</span> Bluetooth &amp; devices</div>
-      <div class="st-nav" style="position:relative" data-p="net"><span class="gl">🌐</span> Network &amp; internet</div>
-      <div class="st-nav" style="position:relative" data-p="about"><span class="gl">ℹ️</span> About</div>
+      <div class="st-user"><div class="avatar" data-avatar>${esc(userInitial())}</div><div><b style="font-size:13px" data-uname>${esc(getUser())}</b><br><small style="color:#9a9a9a;font-size:11px" data-umail>${esc(userEmail())}</small></div></div>
+      ${NAV.map(([p,ic,lbl])=>`<div class="st-nav${p===start?' act':''}" style="position:relative" data-p="${p}"><span class="gl">${ic}</span> ${lbl}</div>`).join("")}
     </div>
-    <div class="st-main">${pages.system}</div>
+    <div class="st-main">${pages[start]}</div>
   </div>`;
   const main=body.querySelector(".st-main");
+  function refreshUser(){
+    const n=getUser(), i=userInitial(), m=userEmail();
+    body.querySelectorAll("[data-uname]").forEach(e=>e.textContent=n);
+    body.querySelectorAll("[data-umail]").forEach(e=>e.textContent=m);
+    body.querySelectorAll("[data-avatar]").forEach(e=>e.textContent=i);
+  }
   function wire(){
     main.querySelectorAll("[data-t='theme']").forEach(t=>t.onclick=()=>{ t.classList.toggle("on"); setTheme(t.classList.contains("on")); });
     main.querySelectorAll("[data-a]").forEach(s=>s.onclick=()=>{
       main.querySelectorAll("[data-a]").forEach(x=>x.classList.remove("sel")); s.classList.add("sel");
-      const [a,solid]=s.dataset.a.split("|"); document.documentElement.style.setProperty("--accent",a); document.documentElement.style.setProperty("--accent-solid",solid);
+      const [a,solid]=s.dataset.a.split("|"); setAccent(a,solid);
     });
-    main.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>setTheme(b.dataset.w==="dark"));
+    main.querySelectorAll("[data-wall]").forEach(w=>w.onclick=()=>{
+      main.querySelectorAll("[data-wall]").forEach(x=>x.classList.remove("sel")); w.classList.add("sel");
+      setWallpaper(w.dataset.wall);
+    });
+    const wd=main.querySelector("[data-wdefault]"); if(wd) wd.onclick=()=>{ clearWallpaper(); main.querySelectorAll("[data-wall]").forEach(x=>x.classList.remove("sel")); };
+    const wi=main.querySelector("[data-wimport]"); if(wi) wi.onclick=pickWallpaperPhoto;
+    const us=main.querySelector("[data-usave]"); if(us) us.onclick=()=>{
+      const inp=main.querySelector("[data-uinput]"); setUser(inp?inp.value:""); refreshUser();
+      if(inp) inp.value=getUser();
+      winDialog({icon:"👤",title:"Accounts",msg:`Hi, <b>${esc(getUser())}</b> 👋 &nbsp;Your name has been updated.`});
+    };
+    const ui=main.querySelector("[data-uinput]"); if(ui) ui.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const b=main.querySelector("[data-usave]"); if(b) b.click(); } });
   }
   wire();
   body.querySelectorAll(".st-nav").forEach(n=>n.onclick=()=>{
@@ -2091,7 +2388,7 @@ function buildSettings(body){
 function setTheme(dark){
   const d=$("#desktop");
   d.classList.toggle("dark",dark); d.classList.toggle("light",!dark);
-  clearWallpaper();
+  try{ localStorage.setItem("wc_theme",dark?"dark":"light"); }catch(e){}
 }
 
 const STORE_APPS=[
@@ -3235,6 +3532,11 @@ renderTaskbarPins();
 renderStartGrid("");
 tick(); setInterval(tick,1000);
 document.body.classList.toggle("glitch", systemStatus().damaged);
+const savedTheme=localStorage.getItem("wc_theme");
+if(savedTheme){ const d=$("#desktop"); d.classList.toggle("dark",savedTheme==="dark"); d.classList.toggle("light",savedTheme!=="dark"); }
+const savedAccent=localStorage.getItem("wc_accent");
+if(savedAccent){ const [a,s]=savedAccent.split("|"); if(a) document.documentElement.style.setProperty("--accent",a); if(s) document.documentElement.style.setProperty("--accent-solid",s); }
+applyUserUI();
 const savedWall=localStorage.getItem("wc_wall");
 if(savedWall) applyWallpaper(savedWall);
 setTimeout(()=>$("#lg-pass").focus(),400);
