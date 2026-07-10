@@ -291,8 +291,8 @@
   .docs-tool.on{background:#d2e3fc;color:#1967d2}
   .docs-sep{width:1px;height:20px;background:#e3e6ea;margin:0 5px}
   .docs-sel{height:30px;border:1px solid #dadce0;border-radius:5px;background:#fff;color:#3c4043;font-size:12.5px;padding:0 4px;outline:none;cursor:default;font-family:inherit}
-  .docs-canvas{flex:1;overflow:auto;padding:26px 10px;display:flex;justify-content:center}
-  .docs-page{background:#fff;width:min(720px,100%);min-height:calc(100% - 0px);box-shadow:0 1px 5px rgba(0,0,0,.16);border:1px solid #e3e6ea;padding:60px 72px;font-size:15px;line-height:1.65;color:#202124;outline:none}
+  .docs-canvas{flex:1;overflow:auto}
+  .docs-page{background:#fff;width:min(720px,calc(100% - 24px));margin:24px auto;min-height:calc(100% - 48px);box-sizing:border-box;box-shadow:0 1px 5px rgba(0,0,0,.16);border:1px solid #e3e6ea;padding:60px 72px;font-size:15px;line-height:1.65;color:#202124;outline:none}
   .docs-page:empty:before{content:"Start typing…";color:#9aa0a6}
   .docs-page h1{font-size:26px;margin:.4em 0}.docs-page h2{font-size:21px;margin:.4em 0}.docs-page h3{font-size:17px;margin:.4em 0}
   .docs-page p{margin:0 0 .55em}
@@ -1257,7 +1257,10 @@ function buildDocs(body,win){
   const setTitle=()=>{ win.querySelector(".tt").textContent=baseTitle()+" — Docs"; };
   const setStatus=t=>{ status.textContent=t; };
 
-  page.addEventListener("blur",()=>{ const s=getSelection(); if(s.rangeCount && page.contains(s.anchorNode)) savedRange=s.getRangeAt(0).cloneRange(); });
+  page.addEventListener("blur",()=>{
+    const s=getSelection(); if(s.rangeCount && page.contains(s.anchorNode)) savedRange=s.getRangeAt(0).cloneRange();
+    if(cur || page.innerText.trim()){ clearTimeout(saveT); save(); }   // flush unsaved edits on blur
+  });
   function withSel(fn){ page.focus(); if(savedRange){ const s=getSelection(); s.removeAllRanges(); s.addRange(savedRange); } fn(); scheduleSave(); syncToolbar(); }
   function cmd(c){ withSel(()=>document.execCommand(c,false,null)); }
 
@@ -1265,7 +1268,7 @@ function buildDocs(body,win){
     if(cur) return true;
     const folder=nodeAt([...HOME_PATH,"Documents"])||nodeAt(HOME_PATH);
     if(!folder||!folder.children) return false;
-    const nm=uniqueName(folder, baseTitle()+".docx");
+    const nm=uniqueName(folder, baseTitle()+".wcdocs");
     folder.children[nm]={icon:"📘",doc:true,html:page.innerHTML,content:page.innerText};
     cur={path:nodeAt([...HOME_PATH,"Documents"])?[...HOME_PATH,"Documents"]:[...HOME_PATH],name:nm};
     return true;
@@ -1293,7 +1296,7 @@ function buildDocs(body,win){
     if(cur){
       const parent=nodeAt(cur.path);
       if(parent&&parent.children){
-        let nn=baseTitle()+".docx";
+        let nn=baseTitle()+".wcdocs";
         if(nn!==cur.name){ if(parent.children[nn]) nn=uniqueName(parent,nn); parent.children[nn]=parent.children[cur.name]; delete parent.children[cur.name]; cur.name=nn; saveFS(); refreshFX(); }
       }
     }
@@ -1501,7 +1504,7 @@ function setAccent(a,solid){
 /* ---- file-type glyphs ---- */
 const EXT_GLYPH={
   txt:"📄",log:"📄",md:"📝",rtf:"📃",ini:"🧾",cfg:"🧾",conf:"🧾",json:"🗂️",xml:"🗂️",yml:"🗂️",yaml:"🗂️",
-  csv:"📊",tsv:"📊",xlsx:"📗",xls:"📗",docx:"📘",doc:"📘",pptx:"📙",ppt:"📙",pdf:"📕",
+  csv:"📊",tsv:"📊",xlsx:"📗",xls:"📗",docx:"📘",doc:"📘",wcdocs:"📘",wcdoc:"📘",pptx:"📙",ppt:"📙",pdf:"📕",
   png:"🖼️",jpg:"🖼️",jpeg:"🖼️",gif:"🖼️",bmp:"🖼️",webp:"🖼️",svg:"🖼️",ico:"🖼️",
   mp4:"🎬",webm:"🎬",mkv:"🎬",avi:"🎬",mov:"🎬",m4v:"🎬",
   mp3:"🎵",wav:"🎵",ogg:"🎵",m4a:"🎵",flac:"🎵",
@@ -1548,7 +1551,7 @@ const NEW_TYPES=[
   {label:"Folder",              icon:"📁", base:"New folder",                 make:()=>({folder:true,children:{}})},
   {label:"Text Document",       icon:"📄", base:"New Text Document.txt",      make:()=>({icon:"📄",content:""})},
   {label:"HTML Document",       icon:"🌐", base:"New HTML Document.html",     make:()=>({icon:"🌐",content:"<!doctype html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>New Page</title>\n  <style>body{font-family:Segoe UI,sans-serif;padding:30px;color:#222}h1{color:#0067c0}</style>\n</head>\n<body>\n  <h1>Hello from WinClone</h1>\n  <p>Edit me in Notepad, then double-click to render.</p>\n</body>\n</html>"})},
-  {label:"Word Document",       icon:"📘", base:"New Document.docx",          make:()=>({icon:"📘",doc:true,html:"<p><br></p>",content:""})},
+  {label:"WinClone Document",   icon:"📘", base:"New Document.wcdocs",        make:()=>({icon:"📘",doc:true,html:"<p><br></p>",content:""})},
   {label:"Rich Text Document",  icon:"📃", base:"New Rich Text Document.rtf", make:()=>({icon:"📃",content:""})},
   {label:"Spreadsheet (CSV)",   icon:"📊", base:"New Spreadsheet.csv",        make:()=>({icon:"📊",content:"name,value\n,"})},
   {label:"Config (INI)",        icon:"🧾", base:"New Config.ini",             make:()=>({icon:"🧾",content:"[settings]\n"})},
@@ -1667,7 +1670,7 @@ function fsOpen(path,name,item){
   if(/\.html?$/.test(lo)) openHtml({path:[...path],name});
   else if(isImg) openImageInPhotos({path:[...path],name});
   else if(isVid || isAud) openMediaIn({path:[...path],name});
-  else if(/\.(docx?|odt|rtf|wcdoc)$/.test(lo)) openDocs({path:[...path],name});
+  else if(/\.(wcdocs?|docx?|odt|rtf)$/.test(lo)) openDocs({path:[...path],name});
   else if(item.exe||item.malware||lo.endsWith(".exe")) runFile(name,item);
   else openFileInNotepad({path:[...path],name}); // txt, md, json, log, rtf, csv, ini, bat, unknown-with-content
 }
