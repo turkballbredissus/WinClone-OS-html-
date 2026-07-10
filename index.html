@@ -1085,6 +1085,7 @@ document.addEventListener("contextmenu", e=>{
     "sep",
     {icon:"📄",label:"New", arrow:true, action:()=>newMenu(e.clientX,e.clientY,dpath)},
     {icon:"📥",label:"Import image…", action:()=>importImages(dpath)},
+    {icon:"📎",label:"Import files…", action:()=>importFilesTo(dpath)},
   ];
   if(CLIP) menu.push({icon:"📋",label:"Paste",action:()=>clipPaste(dpath)});
   menu.push("sep",
@@ -1677,6 +1678,7 @@ function fsOpen(path,name,item){
 /* context menu for a file/folder, reused by Explorer + Desktop */
 function fsItemMenu(x,y,path,name,item,extra){
   const items=[{icon:"📂",label:"Open",action:()=>fsOpen(path,name,item)}];
+  if(!item.sys) items.push({icon:"📤",label:"Export (save to computer)…",action:()=>exportFile(path,name,item)});
   if(/\.(png|jpe?g|gif|bmp)$/i.test(name) && !item.locked)
     items.push({icon:"🖼️",label:"Set as wallpaper",action:()=>setWallpaper(artFor(name,item).g)});
   if(item.archive) items.push({icon:"📦",label:"Extract all here",action:()=>extractArchive(path,name,item)});
@@ -2173,6 +2175,164 @@ function importImages(targetPath,done){
   };
   inp.click();
 }
+
+/* ============================ IMPORT / EXPORT ============================ */
+/* Bridge between the user's real computer and WinClone's virtual filesystem. */
+const IE_TEXT_EXTS=["txt","html","htm","rtf","csv","ini","md","json","log","bat"];
+const IE_ACCEPT=".txt,.html,.htm,.docx,.wcdocs,.rtf,.csv,.ini,.md,.json,.log,.bat,.bmp,.zip,.rar";
+
+/* --- byte / base64 helpers --- */
+function ieB64(bytes){ let s="",CH=0x8000; for(let i=0;i<bytes.length;i+=CH) s+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH)); return btoa(s); }
+function ieUnB64(b64){ const s=atob(b64),a=new Uint8Array(s.length); for(let i=0;i<s.length;i++) a[i]=s.charCodeAt(i); return a; }
+function ieDataURLBytes(u){ return ieUnB64(u.slice(u.indexOf(",")+1)); }
+function ieFileDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error); r.readAsDataURL(file); }); }
+function ieDownload(blob,name){ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
+
+/* --- minimal ZIP writer (STORED / no compression — reads fine in Word, Explorer, etc.) --- */
+const IE_CRC=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+function ieCrc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c=IE_CRC[(c^b[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function ieBuildZip(files){
+  const enc=new TextEncoder(), u16=n=>[n&255,(n>>8)&255], u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>>24)&255];
+  const parts=[], central=[]; let off=0;
+  files.forEach(f=>{
+    const nb=enc.encode(f.name), d=f.bytes, crc=ieCrc32(d);
+    const lh=[].concat(u32(0x04034b50),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(d.length),u32(d.length),u16(nb.length),u16(0));
+    parts.push(new Uint8Array(lh),nb,d);
+    central.push({nb,crc,size:d.length,off}); off+=30+nb.length+d.length;
+  });
+  const cdStart=off, cd=[];
+  central.forEach(c=>{ const r=[].concat(u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(c.crc),u32(c.size),u32(c.size),u16(c.nb.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(c.off)); cd.push(new Uint8Array(r),c.nb); });
+  let cdLen=0; cd.forEach(c=>cdLen+=c.length);
+  const eocd=new Uint8Array([].concat(u32(0x06054b50),u16(0),u16(0),u16(central.length),u16(central.length),u32(cdLen),u32(cdStart),u16(0)));
+  return new Blob([...parts,...cd,eocd],{type:"application/zip"});
+}
+
+/* --- ZIP reader (STORED + DEFLATE via the browser's DecompressionStream) --- */
+async function ieInflate(bytes){
+  const ds=new DecompressionStream("deflate-raw");
+  const buf=await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+  return new Uint8Array(buf);
+}
+async function ieReadZip(bytes){
+  const dv=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  let p=-1; for(let i=bytes.length-22;i>=0;i--){ if(dv.getUint32(i,true)===0x06054b50){ p=i; break; } }
+  if(p<0) throw new Error("not a zip");
+  const count=dv.getUint16(p+10,true); let o=dv.getUint32(p+16,true);
+  const out={};
+  for(let n=0;n<count;n++){
+    if(dv.getUint32(o,true)!==0x02014b50) break;
+    const method=dv.getUint16(o+10,true), comp=dv.getUint32(o+20,true);
+    const nl=dv.getUint16(o+28,true), el=dv.getUint16(o+30,true), cl=dv.getUint16(o+32,true), lho=dv.getUint32(o+42,true);
+    const nm=new TextDecoder().decode(bytes.subarray(o+46,o+46+nl));
+    const lnl=dv.getUint16(lho+26,true), lel=dv.getUint16(lho+28,true), dstart=lho+30+lnl+lel;
+    const cbytes=bytes.subarray(dstart,dstart+comp);
+    if(!nm.endsWith("/")){
+      if(method===0) out[nm]=cbytes;
+      else if(method===8){ try{ out[nm]=await ieInflate(cbytes); }catch(e){} }
+    }
+    o+=46+nl+el+cl;
+  }
+  return out;
+}
+
+/* --- .wcdocs custom format:  line 1 = magic "WCDOCS/1",  rest = JSON {title,html,text} --- */
+function wcdocsSerialize(item){ return "WCDOCS/1\n"+JSON.stringify({title:item.title||"", html:item.html||"", text:item.content||""}); }
+function wcdocsParse(text){
+  if(/^WCDOCS\/1\r?\n/.test(text)){ try{ const o=JSON.parse(text.slice(text.indexOf("\n")+1)); return {icon:"📘",doc:true,html:o.html||docTextToHtml(o.text||""),content:o.text||""}; }catch(e){} }
+  return {icon:"📘",doc:true,html:docTextToHtml(text),content:text};
+}
+
+/* --- .docx (Office Open XML) read/write --- */
+function ieXmlDecode(s){ return s.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,"&"); }
+function ieXmlEnc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+async function ieDocxToDoc(bytes){
+  const files=await ieReadZip(bytes), xb=files["word/document.xml"];
+  if(!xb) throw new Error("no document.xml");
+  const xml=new TextDecoder().decode(xb);
+  const paras=xml.split(/<w:p[ >\/]/).slice(1).map(seg=>ieXmlDecode([...seg.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)].map(m=>m[1]).join("")));
+  return { html: paras.map(p=>"<p>"+(p?esc(p):"<br>")+"</p>").join("")||"<p><br></p>", text: paras.join("\n") };
+}
+function ieDocToDocx(paras){
+  const enc=new TextEncoder();
+  const body=paras.map(p=>`<w:p><w:r><w:t xml:space="preserve">${ieXmlEnc(p)}</w:t></w:r></w:p>`).join("")||"<w:p/>";
+  const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+  const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  return ieBuildZip([
+    {name:"[Content_Types].xml",bytes:enc.encode(ct)},
+    {name:"_rels/.rels",bytes:enc.encode(rels)},
+    {name:"word/document.xml",bytes:enc.encode(doc)},
+  ]);
+}
+
+/* --- IMPORT --- */
+function importFilesTo(destPath,done){
+  const inp=document.createElement("input"); inp.type="file"; inp.multiple=true; inp.accept=IE_ACCEPT;
+  inp.onchange=async()=>{
+    const files=[...(inp.files||[])]; if(!files.length) return;
+    const dest=nodeAt(destPath); if(!dest||!dest.children){ winDialog({icon:"⚠️",title:"Import",msg:"That folder can't be found."}); return; }
+    let ok=0, fail=0;
+    for(const f of files){ try{ await ieImportOne(dest,f); ok++; }catch(e){ fail++; } }
+    try{ saveFS(); }catch(e){}
+    refreshFX();
+    winDialog({icon:"📥",title:"Import",msg:`${ok} file(s) imported to <b>${esc(destPath[destPath.length-1])}</b>.${fail?`<br><small style="color:#9a9a9a">${fail} couldn't be read.</small>`:""}`});
+    if(done) done();
+  };
+  inp.click();
+}
+async function ieImportOne(dest,file){
+  const name=uniqueName(dest,(file.name||"file").replace(/[\\/:*?"<>|]/g,"_"));
+  const ext=extOf(name); let item;
+  if(IE_TEXT_EXTS.includes(ext)){ item={icon:glyphFor(name,{}),content:await file.text()}; }
+  else if(ext==="wcdocs"){ item=wcdocsParse(await file.text()); }
+  else if(ext==="docx"){
+    try{ const d=await ieDocxToDoc(new Uint8Array(await file.arrayBuffer())); item={icon:"📘",doc:true,html:d.html,content:d.text}; }
+    catch(e){ item={icon:"📘",doc:true,html:"<p>[Imported Word document — its text couldn't be read.]</p>",content:""}; }
+  }
+  else if(ext==="bmp"){ item={icon:"🖼️",img:await ieFileDataURL(file)}; }
+  else if(ext==="zip"||ext==="rar"){
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    item={icon:"🗜️",archive:true,raw:ieB64(bytes),mime:file.type||(ext==="zip"?"application/zip":"application/x-rar-compressed"),children:{}};
+    if(ext==="zip"){ try{
+      const map=await ieReadZip(bytes), kids={};
+      Object.keys(map).forEach(k=>{ const bn=uniqueName({children:kids},k.split("/").pop()||"file"), e2=extOf(bn);
+        kids[bn]= IE_TEXT_EXTS.includes(e2) ? {icon:glyphFor(bn,{}),content:new TextDecoder().decode(map[k])}
+                : /^(png|jpe?g|gif|bmp|webp)$/.test(e2) ? {icon:"🖼️",img:"data:image/"+(e2==="jpg"?"jpeg":e2)+";base64,"+ieB64(map[k])}
+                : {icon:glyphFor(bn,{}),raw:ieB64(map[k]),mime:"application/octet-stream"};
+      });
+      item.children=kids;
+    }catch(e){} }
+  }
+  else { item={icon:glyphFor(name,{}),content:await file.text()}; }
+  dest.children[name]=item;
+}
+
+/* --- EXPORT (download the selected WinClone file to the real computer) --- */
+function ieFileBytes(name,item){
+  const enc=new TextEncoder();
+  if(item.raw) return ieUnB64(item.raw);
+  if(item.img){ try{ return ieDataURLBytes((item.img.match(/data:[^)'"]+/)||[item.img])[0]); }catch(e){ return new Uint8Array(); } }
+  if(item.doc) return enc.encode(wcdocsSerialize(item));
+  return enc.encode(item.content||"");
+}
+function exportFile(path,name,item){
+  try{
+    const ext=extOf(name); let blob, out=name;
+    if(item.folder && !item.archive){
+      const files=[]; (function walk(node,pre){ Object.keys(node.children||{}).forEach(k=>{ const it=node.children[k]; if(it.folder&&!it.archive) walk(it,pre+k+"/"); else files.push({name:pre+k,bytes:ieFileBytes(k,it)}); }); })(item,"");
+      blob=ieBuildZip(files); out=name+".zip";
+    }
+    else if(ext==="wcdocs") blob=new Blob([wcdocsSerialize(item)],{type:"application/octet-stream"});
+    else if(ext==="docx") blob=ieDocToDocx((item.content||"").split(/\r?\n/));
+    else if(item.raw) blob=new Blob([ieUnB64(item.raw)],{type:item.mime||"application/octet-stream"});
+    else if(item.img){ const u=(item.img.match(/data:[^)'"]+/)||[item.img])[0]; blob=new Blob([ieDataURLBytes(u)],{type:(u.match(/data:([^;]+)/)||[])[1]||"image/png"}); if(!/\.[a-z0-9]+$/i.test(out)) out+=".png"; }
+    else if(item.archive){ const files=[]; Object.keys(item.children||{}).forEach(k=>{ const it=item.children[k]; if(!it.folder) files.push({name:k,bytes:ieFileBytes(k,it)}); }); blob=ieBuildZip(files); if(!/\.(zip|rar)$/i.test(out)) out+=".zip"; }
+    else blob=new Blob([item.content||""],{type:"text/plain"});
+    ieDownload(blob,out);
+    malInfo("📤","Exported","Saved "+out+" to your computer");
+  }catch(e){ winDialog({icon:"⚠️",title:"Export failed",msg:"Couldn't export <b>"+esc(name)+"</b>."}); }
+}
+
 function buildExplorer(body){
   body.innerHTML=`<div class="fx">
     <div class="fx-side">
@@ -2255,6 +2415,7 @@ function buildExplorer(body){
     const menu=[{icon:"📄",label:"New", arrow:true, action:()=>newMenu(e.clientX,e.clientY,[...path])}];
     if(CLIP) menu.push({icon:"📋",label:"Paste",action:()=>clipPaste([...path])});
     menu.push({icon:"📥",label:"Import image from computer…",action:()=>importImages([...path])});
+    menu.push({icon:"📎",label:"Import files from computer…",action:()=>importFilesTo([...path])});
     menu.push("sep",{icon:"🔄",label:"Refresh",action:render});
     showCtx(e.clientX,e.clientY,menu);
   };
