@@ -277,6 +277,21 @@
   .edge-links{display:flex;gap:26px;margin-top:34px;flex-wrap:wrap;justify-content:center}
   .edge-links a{display:flex;flex-direction:column;align-items:center;gap:8px;color:#333;text-decoration:none;font-size:12px;cursor:default}
   .edge-links a .gl{font-size:30px;width:56px;height:56px;background:#eef1f4;border-radius:12px;display:grid;place-items:center}
+  .edge-links a:hover .gl{background:#e2e7ec}
+  .edge-bm{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap;justify-content:center;max-width:660px}
+  .edge-bm a{display:flex;flex-direction:column;align-items:center;gap:7px;width:80px;text-align:center;color:#333;font-size:12px;cursor:default}
+  .edge-bm a .gl{font-size:26px;width:52px;height:52px;background:#eef1f4;border-radius:12px;display:grid;place-items:center}
+  .edge-bm a:hover .gl{background:#e2e7ec}
+  .edge-page.edge-site{padding:0;align-items:stretch;justify-content:stretch;background:#fff}
+  .edge-frame{flex:1;border:0;width:100%;height:100%;background:#fff;opacity:0;transition:opacity .18s}
+  .edge-load{margin:auto;color:#7a7a7a;font-size:13.5px;display:flex;align-items:center;gap:10px}
+  .edge-load::before{content:"";width:16px;height:16px;border:2px solid #c9ced4;border-top-color:#0067c0;border-radius:50%;animation:edgespin .7s linear infinite}
+  @keyframes edgespin{to{transform:rotate(360deg)}}
+  .edge-reject{margin:auto;text-align:center;color:#555;display:flex;flex-direction:column;align-items:center;gap:12px;padding:30px;max-width:400px}
+  .edge-reject .em{font-size:66px;line-height:1}
+  .edge-reject b{font-size:20px;color:#222}
+  .edge-reject .rj-sub{font-size:13px;line-height:1.55}
+  .edge-reject .rj-btns{display:flex;gap:10px;margin-top:4px}
 
   .photos{height:100%;background:#1b1b1b;padding:14px;overflow:auto;display:grid;
     grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:flex-start}
@@ -1402,9 +1417,16 @@ function fsOpen(path,name,item){
   if(item.archive){ openArchive({path:[...path],name}); return; }
   if(item.folder){ openExplorerAt([...path,name]); return; }
   const lo=name.toLowerCase();
+  const isImg=/\.(png|jpe?g|gif|bmp|webp)$/.test(lo);
+  const isVid=/\.(mp4|webm|mkv|avi|mov|m4v)$/.test(lo);
+  // Files pulled off the real web are inert: only images and videos may open.
+  if(item.web && !isImg && !isVid){
+    winDialog({icon:"🚫",title:name,msg:`<b>${esc(name)}</b> was downloaded from the internet.<br>WinClone won't run files from the web — only images and videos will open.`});
+    return;
+  }
   if(/\.html?$/.test(lo)) openHtml({path:[...path],name});
-  else if(/\.(png|jpe?g|gif|bmp)$/.test(lo)) openImageInPhotos({path:[...path],name});
-  else if(/\.(mp4|mp3|wav|mkv|avi)$/.test(lo)) openMediaIn({path:[...path],name});
+  else if(isImg) openImageInPhotos({path:[...path],name});
+  else if(isVid || /\.(mp3|wav)$/.test(lo)) openMediaIn({path:[...path],name});
   else if(item.exe||item.malware||lo.endsWith(".exe")) runFile(name,item);
   else openFileInNotepad({path:[...path],name}); // txt, rtf, csv, ini, log, unknown-with-content
 }
@@ -1830,7 +1852,7 @@ function allImages(){
     Object.keys(kids).forEach(k=>{
       const it=kids[k];
       if(it.folder) walk(it,[...path,k]);
-      else if(/\.(png|jpe?g|gif|bmp)$/i.test(k)) out.push({name:k,path:[...path],item:it});
+      else if(/\.(png|jpe?g|gif|bmp|webp)$/i.test(k)) out.push({name:k,path:[...path],item:it});
     });
   })({children:VFS},[]);
   return out;
@@ -2085,32 +2107,145 @@ const STORE_APPS=[
   {file:"Minecraft_1.20_FULL.exe",icon:"🟩",name:"Minecraft FREE (full)", desc:"Full version, no login needed!! working", malware:true, kind:"worm"},
   {file:"SystemCleaner_Pro.exe", icon:"🧹", name:"System Cleaner Pro",    desc:"Speed up your PC by 300%! free download", malware:true, kind:"spyware"},
 ];
+/* Curated frame-friendly bookmarks. Real sites that allow being embedded. */
+const EDGE_BOOKMARKS=[
+  {name:"Web Demon List", url:"https://webdemonlist.org",      icon:"👹"},
+  {name:"Web Dashers",    url:"https://web-dashers.github.io", icon:"🏃"},
+  {name:"Wikipedia",      url:"https://en.wikipedia.org",      icon:"📚"},
+  {name:"example.com",    url:"https://example.com",           icon:"🌐"},
+];
+/* extensions the "browser" treats as a download rather than a page to render */
+const EDGE_DL_RE=/\.(png|jpe?g|gif|bmp|webp|svg|mp4|webm|mkv|avi|mov|m4v|mp3|wav|exe|msi|zip|rar|7z|iso|dmg|apk|pdf|docx?|xlsx?|pptx?|txt|csv|bin|scr|bat|dll)$/i;
+/* Big sites that forbid being embedded (X-Frame-Options / frame-ancestors). A framed page
+   and a browser-blocked page are indistinguishable to script, so we can't detect the refusal
+   after the fact — we recognise the usual suspects up front and show the rejection screen. */
+const EDGE_BLOCKED=["google.com","facebook.com","fb.com","instagram.com","twitter.com","x.com",
+  "reddit.com","amazon.com","netflix.com","linkedin.com","github.com","gitlab.com","microsoft.com",
+  "live.com","office.com","bing.com","apple.com","icloud.com","tiktok.com","whatsapp.com","yahoo.com",
+  "duckduckgo.com","stackoverflow.com","pinterest.com","twitch.tv","spotify.com","paypal.com",
+  "ebay.com","youtube.com","chatgpt.com","openai.com","roblox.com","discord.com"];
+function edgeBlocked(u){
+  let h; try{ h=new URL(u).hostname.toLowerCase(); }catch(e){ return false; }
+  return EDGE_BLOCKED.some(d=> h===d || h.endsWith("."+d));
+}
 function buildEdge(body){
   body.innerHTML=`<div class="edge">
     <div class="edge-bar">
-      <button class="edge-nav" data-h>←</button><button class="edge-nav">→</button><button class="edge-nav" data-r>⟳</button>
-      <input class="edge-url" value="https://www.bing.com">
+      <button class="edge-nav" data-b title="Back">←</button><button class="edge-nav" data-f title="Forward">→</button><button class="edge-nav" data-r title="Reload">⟳</button>
+      <input class="edge-url" value="https://www.bing.com" spellcheck="false">
     </div>
     <div class="edge-page"></div></div>`;
   const page=body.querySelector(".edge-page"), url=body.querySelector(".edge-url");
+  let stack=[], si=-1;                         // in-app history
+  const hostOf=u=>{ try{ return new URL(u).hostname||u; }catch(e){ return u; } };
+
+  function render(loc){
+    page.className="edge-page";
+    page.style.alignItems=""; page.style.paddingTop="";
+    if(loc.type==="store") store();
+    else if(loc.type==="wp") wallpapers();
+    else if(loc.type==="site") loadSite(loc.u);
+    else home();
+  }
+  function navTo(loc){ stack=stack.slice(0,si+1); stack.push(loc); si=stack.length-1; render(loc); }
+  function back(){ if(si>0){ si--; render(stack[si]); } }
+  function fwd(){ if(si<stack.length-1){ si++; render(stack[si]); } }
+  function reload(){ if(si>=0) render(stack[si]); else navTo({type:"home"}); }
+  function restoreBar(){ if(si>=0) render(stack[si]); else navTo({type:"home"}); }
+
+  /* parse the address bar: internal route, download, real URL, or search */
+  function go(raw){
+    const q=(raw||"").trim();
+    if(!q){ navTo({type:"home"}); return; }
+    const low=q.toLowerCase();
+    if(/^(home|about:|https?:\/\/(www\.)?bing\.com\/?$)/.test(low) || low==="bing.com"){ navTo({type:"home"}); return; }
+    if(/winstore|store\.wc|^store$/.test(low)){ navTo({type:"store"}); return; }
+    if(/wallpaper/.test(low)){ navTo({type:"wp"}); return; }
+    const looksUrl=/^https?:\/\//.test(q) || (/^[^\s]+\.[a-z]{2,}(\/|$|\?|#)/i.test(q) && !/\s/.test(q));
+    let u = looksUrl ? (/^https?:\/\//.test(q)? q : "https://"+q)
+                     : "https://en.wikipedia.org/w/index.php?search="+encodeURIComponent(q);
+    const path=u.split("#")[0].split("?")[0], last=path.split("/").pop()||"";
+    if(EDGE_DL_RE.test(last)){ downloadFromWeb(u); return; }
+    navTo({type:"site",u});
+  }
+
+  /* real page in a locked-down iframe; genuinely can't touch WinClone's data */
+  function loadSite(u){
+    url.value=u;
+    if(edgeBlocked(u)){ showRejected(u); return; }
+    page.className="edge-page edge-site";
+    page.innerHTML=`<div class="edge-load">Loading ${esc(hostOf(u))}…</div>
+      <iframe class="edge-frame" referrerpolicy="no-referrer"
+        sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin"></iframe>`;
+    const frame=page.querySelector(".edge-frame"), load=page.querySelector(".edge-load");
+    let done=false;
+    const t=setTimeout(()=>{ if(!done){ done=true; showRejected(u); } }, 8000);
+    frame.addEventListener("load",()=>{ if(done) return; done=true; clearTimeout(t); if(load)load.remove(); frame.style.opacity=1; });
+    frame.src=u;
+  }
+  function showRejected(u){
+    page.className="edge-page";
+    page.innerHTML=`<div class="edge-reject">
+      <div class="em">😵</div>
+      <b>WinClone got rejected :(</b>
+      <div class="rj-sub"><b>${esc(hostOf(u))}</b> won't let WinClone open it in a window.<br>Some sites block being embedded like this — it's the site's rule, not your PC's fault.</div>
+      <div class="rj-btns">
+        <button class="wp-btn pri" data-retry>Try again</button>
+        <button class="wp-btn" data-home>WinSearch home</button>
+      </div></div>`;
+    page.querySelector("[data-retry]").onclick=()=>loadSite(u);
+    page.querySelector("[data-home]").onclick=()=>navTo({type:"home"});
+  }
+
+  /* "download" a web file into the VFS Downloads folder. Never touches the real disk. */
+  function downloadFromWeb(u){
+    const path=u.split("#")[0].split("?")[0];
+    let fname=decodeURIComponent(path.split("/").pop()||"download").replace(/[\\/:*?"<>|]/g,"_")||"download";
+    const dls=nodeAt([...HOME_PATH,"Downloads"]);
+    if(!dls){ winDialog({icon:"⚠️",title:"Download",msg:"The Downloads folder is missing."}); restoreBar(); return; }
+    if(dls.children[fname]){
+      const dot=fname.lastIndexOf("."), b=dot>0?fname.slice(0,dot):fname, ext=dot>0?fname.slice(dot):"";
+      let n=1; while(dls.children[b+" ("+n+")"+ext]) n++; fname=b+" ("+n+")"+ext;
+    }
+    const lo=fname.toLowerCase();
+    const isImg=/\.(png|jpe?g|gif|bmp|webp|svg)$/.test(lo), isVid=/\.(mp4|webm|mkv|avi|mov|m4v)$/.test(lo);
+    winDialog({icon:"⬇️",title:"Downloading…",msg:`Getting <b>${esc(fname)}</b> from ${esc(hostOf(u))}…`});
+    setTimeout(()=>{
+      const item={web:true};
+      if(isImg){ item.icon="🖼️"; item.img=u; }
+      else if(isVid){ item.icon="🎬"; }
+      else { item.icon = lo.endsWith(".exe")||lo.endsWith(".msi")||lo.endsWith(".scr")||lo.endsWith(".bat") ? "⚙️" : "📄"; }
+      dls.children[fname]=item; saveFS(); refreshFX();
+      const ok=isImg||isVid;
+      winDialog({icon:item.icon,title:"Download complete",
+        msg:`<b>${esc(fname)}</b> saved to Downloads.<br><small style="color:#9a9a9a">${ok?"Double-click it to open it.":"Heads up: WinClone won't run files downloaded from the web."}</small>`});
+    },1000);
+    restoreBar();
+  }
+
   function home(){
     url.value="https://www.bing.com";
-    page.style.alignItems="center"; page.style.paddingTop="70px";
+    page.className="edge-page";
+    page.style.alignItems="center"; page.style.paddingTop="60px";
     page.innerHTML=`
       <div class="logo">WinSearch</div>
-      <input class="edge-search" placeholder="Search the web">
+      <input class="edge-search" placeholder="Search the web or type a URL">
+      <div class="edge-bm"></div>
       <div class="edge-links">
         <a data-store><span class="gl">⬇️</span>App Store</a>
         <a data-wp><span class="gl">🖼️</span>Wallpapers</a>
-        <a data-open="edge"><span class="gl">📰</span>News</a>
-        <a data-open="edge"><span class="gl">🛒</span>Shopping</a>
-        <a data-open="edge"><span class="gl">🎬</span>Video</a>
+        <a data-yt><span class="gl">▶️</span>YouTube</a>
       </div>`;
     const search=page.querySelector(".edge-search");
-    search.addEventListener("keydown",e=>{ if(e.key==="Enter"&&search.value.trim()){ url.value="https://www.bing.com/search?q="+encodeURIComponent(search.value); results(search.value.trim()); }});
-    page.querySelectorAll("[data-open]").forEach(a=>a.onclick=()=>openApp(a.dataset.open));
-    page.querySelector("[data-store]").onclick=store;
-    page.querySelector("[data-wp]").onclick=wallpapers;
+    search.addEventListener("keydown",e=>{ if(e.key==="Enter"&&search.value.trim()) go(search.value); });
+    const bm=page.querySelector(".edge-bm");
+    EDGE_BOOKMARKS.forEach(b=>{
+      const a=el("a"); a.innerHTML=`<span class="gl">${b.icon}</span>${esc(b.name)}`;
+      a.onclick=()=>go(b.url); bm.appendChild(a);
+    });
+    page.querySelector("[data-store]").onclick=()=>navTo({type:"store"});
+    page.querySelector("[data-wp]").onclick=()=>navTo({type:"wp"});
+    page.querySelector("[data-yt]").onclick=()=>openApp("youtube");
   }
   function wallpapers(){
     url.value="https://wallpapers.wc";
@@ -2203,15 +2338,11 @@ function buildEdge(body){
       listEl.appendChild(row);
     });
   }
-  url.addEventListener("keydown",e=>{ if(e.key==="Enter"){
-    const q=url.value.replace(/^https?:\/\//,'').trim();
-    if(/winstore|store/.test(q)) store();
-    else if(/wallpaper/.test(q)) wallpapers();
-    else results(q||"bing.com");
-  }});
-  body.querySelector("[data-h]").onclick=home;
-  body.querySelector("[data-r]").onclick=home;
-  home();
+  url.addEventListener("keydown",e=>{ if(e.key==="Enter") go(url.value); });
+  body.querySelector("[data-b]").onclick=back;
+  body.querySelector("[data-f]").onclick=fwd;
+  body.querySelector("[data-r]").onclick=reload;
+  navTo({type:"home"});
 }
 
 /* ---- photos ---- */
