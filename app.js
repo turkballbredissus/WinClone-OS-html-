@@ -3129,7 +3129,7 @@ $("#start-search").addEventListener("input", e=>renderStartGrid(e.target.value))
 $("#start-search").addEventListener("keydown", e=>{
   if(e.key==="Enter"){ const first=$("#sm-grid").querySelector(".sm-app"); if(first) first.click(); }
 });
-$("#powerbtn").onclick = ()=>{ closeFlyouts(); doShutdown(); };
+$("#powerbtn").onclick = (e)=>{ e.stopPropagation(); showPowerMenu(); };
 document.querySelectorAll("#quick .qs-tile").forEach(t=>t.onclick=()=>{
   t.classList.toggle("on");
   if(t.dataset.q==="wifi") renderWifi();
@@ -3170,20 +3170,71 @@ function doShutdown(){
   }, 1800);
 }
 
-/* ---- update detection: fingerprint the deployed files; if they changed since last
-   visit, play a Windows-Update-style screen at the next login. (Works when served over
-   http, e.g. GitHub Pages; on file:// the fetch is blocked and it silently no-ops.) ---- */
-let UPDATE_PENDING=false;
-(async function checkForUpdate(){
+/* ---- MANUAL SYSTEM UPDATES ----
+   WinClone boots an *installed* copy of app.js+styles.css from localStorage
+   (wc_sys_js / wc_sys_css), loaded by the bootstrap in index.html. A new GitHub
+   deploy is detected but NOT applied until the user chooses "Update and restart"
+   from Start ▸ Power — so skipping the update keeps the old version running.
+   (http/GitHub Pages only; on file:// the on-disk files always load and there is
+   nothing to update against.) */
+function wcHash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return s.length+"-"+h.toString(16); }
+function installedBuild(){ return wcHash((localStorage.getItem("wc_sys_js")||"")+"|"+(localStorage.getItem("wc_sys_css")||"")); }
+function isHosted(){ return /^https?:$/.test(location.protocol); }
+const UPD={available:false, latest:null, checking:false};
+async function fetchLatestSys(){
+  const bust=f=>fetch(f+"?v="+Date.now(),{cache:"no-store"}).then(r=>{ if(!r.ok) throw new Error("http "+r.status); return r.text(); });
+  const [js,css]=await Promise.all([bust("app.js"),bust("styles.css")]);
+  return {js,css,build:wcHash(js+"|"+css)};
+}
+async function checkForUpdates(opts){
+  opts=opts||{};
+  if(!isHosted()||!localStorage.getItem("wc_sys_js")) return false;   // file:// or not installed via bootstrap
+  if(UPD.checking) return UPD.available;
+  UPD.checking=true;
   try{
-    const texts=await Promise.all(["app.js","styles.css","index.html"].map(f=>fetch(f).then(r=>r.text()).catch(()=>"")));
-    const blob=texts.join("|"); let h=5381;
-    for(let i=0;i<blob.length;i++) h=((h<<5)+h+blob.charCodeAt(i))>>>0;
-    const build=blob.length+"-"+h.toString(16), prev=localStorage.getItem("wc_build");
-    if(prev && prev!==build) UPDATE_PENDING=true;
-    localStorage.setItem("wc_build",build);
-  }catch(e){}
-})();
+    const latest=await fetchLatestSys();
+    UPD.latest=latest;
+    UPD.available = latest.build!==installedBuild();
+    reflectUpdateUI();
+    if(UPD.available && opts.notify)
+      notify({icon:"🔄",title:"Updates are available",body:"A new version of WinClone is ready. Open Start ▸ Power ▸ Update and restart to install it."});
+    else if(!UPD.available && opts.toastIfNone)
+      showToast({icon:"✅",title:"You're up to date",body:"WinClone is running the latest version."});
+    return UPD.available;
+  }catch(e){ return false; }
+  finally{ UPD.checking=false; }
+}
+function reflectUpdateUI(){ document.body.classList.toggle("has-update", !!UPD.available); }
+async function applyUpdate(){
+  let latest=UPD.latest;
+  try{ if(!latest) latest=await fetchLatestSys(); }
+  catch(e){ winDialog({icon:"⚠️",title:"Update failed",msg:"Couldn't download the update.<br><small style='color:#9a9a9a'>Check your connection and try again.</small>"}); return; }
+  try{
+    localStorage.setItem("wc_sys_js",latest.js);
+    localStorage.setItem("wc_sys_css",latest.css);
+  }catch(e){ winDialog({icon:"⚠️",title:"Update failed",msg:"Not enough storage to install the update.<br><small style='color:#9a9a9a'>Free some space (delete large files/images) and try again.</small>"}); return; }
+  UPD.available=false; reflectUpdateUI();
+  runUpdateScreen(()=>location.reload());   // reload → bootstrap boots the newly-installed version
+}
+/* Start ▸ Power menu */
+function showPowerMenu(){
+  const btn=$("#powerbtn"); if(!btn) return;
+  const r=btn.getBoundingClientRect();
+  const items=[];
+  if(UPD.available) items.push({icon:"🔄",label:"Update and restart",action:()=>{ closeFlyouts(); applyUpdate(); }});
+  items.push(
+    {icon:"🔁",label:"Restart",action:()=>{ closeFlyouts(); doRestart(); }},
+    {icon:"⏻",label:"Shut down",action:()=>{ closeFlyouts(); doShutdown(); }},
+    "sep",
+    {icon:"🔎",label:"Check for updates",action:()=>{ closeFlyouts(); checkForUpdates({notify:true,toastIfNone:true}); }}
+  );
+  showCtx(r.left, r.top, items);
+}
+function doRestart(){
+  stopAllEffectsUI();
+  const sd=$("#shutdown"); sd.style.display="flex"; $("#sd-text").textContent="Restarting…";
+  setTimeout(()=>location.reload(),1600);
+}
 function runUpdateScreen(done){
   $("#login").classList.add("hide");
   const u=$("#update"); if(!u){ done(); return; }
@@ -3200,10 +3251,7 @@ function runUpdateScreen(done){
 }
 
 /* login */
-function signIn(){
-  if(UPDATE_PENDING){ UPDATE_PENDING=false; runUpdateScreen(doSignIn); return; }
-  doSignIn();
-}
+function signIn(){ doSignIn(); }
 function doSignIn(){
   $("#login").classList.add("hide");
   setTimeout(()=>$("#lg-pass").blur(),100);
@@ -3211,6 +3259,7 @@ function doSignIn(){
   refreshInfectionFX();
   ssArm();
   notify({icon:"👋",title:"Welcome back, "+getUser(),body:"You're signed in to WinClone."});
+  setTimeout(()=>checkForUpdates({notify:true}), 3000);   // quietly look for a new version after login
   const st=systemStatus();
   if(st.critical){
     setTimeout(()=>winDialog({icon:"❌",title:"WinClone — Critical",

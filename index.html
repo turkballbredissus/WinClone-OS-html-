@@ -4,7 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WinClone</title>
-<link rel="stylesheet" href="styles.css">
+<script>
+/* ===== WinClone bootstrap / installer =====
+   On http(s) (e.g. GitHub Pages) WinClone runs an *installed* copy of its own code
+   (app.js + styles.css) kept in localStorage. A fresh deploy is downloaded but NOT
+   applied until the user picks "Update and restart" from Start ▸ Power — so if you
+   don't update, you keep running the old version. On file:// there's no repo to
+   update against, so the on-disk files load directly. */
+(function(){
+  var http = /^https?:$/.test(location.protocol);
+  var CSS = http ? localStorage.getItem("wc_sys_css") : null;
+  var JS  = http ? localStorage.getItem("wc_sys_js")  : null;
+  // styles first (synchronous), to avoid a flash of unstyled content
+  if(CSS){ var st=document.createElement("style"); st.id="wc-sys-css"; st.textContent=CSS; document.head.appendChild(st); }
+  else   { var lk=document.createElement("link"); lk.rel="stylesheet"; lk.href="styles.css"; document.head.appendChild(lk); }
+  function inject(code){ var s=document.createElement("script"); s.textContent=code; document.body.appendChild(s); }
+  function injectSrc(){ var s=document.createElement("script"); s.src="app.js"; document.body.appendChild(s); }
+  function bust(f){ return fetch(f+"?v="+Date.now(),{cache:"no-store"}).then(function(r){ if(!r.ok) throw 0; return r.text(); }); }
+  function start(){
+    if(JS){ inject(JS); return; }                 // boot the installed (possibly older) version
+    if(!http){ injectSrc(); return; }              // file:// — load the on-disk files
+    // first run on a server: download the current version, install it, then boot it
+    Promise.all([bust("app.js"), bust("styles.css")]).then(function(r){
+      try{ localStorage.setItem("wc_sys_js", r[0]); localStorage.setItem("wc_sys_css", r[1]); }catch(e){}
+      inject(r[0]);
+    }).catch(injectSrc);                           // offline on first run: fall back to on-disk
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+})();
+</script>
 </head>
 <body>
 
@@ -151,6 +180,5 @@
   <div class="bios-foot">v4.8 (C)Copyright 2026, WinClone Megatrends, Inc.</div>
 </div>
 
-<script src="app.js"></script>
 </body>
 </html>

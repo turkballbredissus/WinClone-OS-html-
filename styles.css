@@ -132,8 +132,11 @@
   .sm-user{display:flex;align-items:center;gap:10px;font-size:13px;padding:6px 10px;border-radius:6px;cursor:default}
   .sm-user:hover{background:rgba(255,255,255,.09)}
   .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#5a8fe0,#8a5ad2);display:grid;place-items:center;font-size:14px;font-weight:600}
-  #powerbtn{width:34px;height:34px;border-radius:6px;border:0;background:transparent;font-size:16px;cursor:default}
+  #powerbtn{position:relative;width:34px;height:34px;border-radius:6px;border:0;background:transparent;font-size:16px;cursor:default}
   #powerbtn:hover{background:rgba(255,255,255,.09)}
+  /* update-available indicator: an orange dot on the power button (like real Windows) */
+  body.has-update #powerbtn::after{content:"";position:absolute;top:5px;right:5px;width:8px;height:8px;
+    border-radius:50%;background:#f7a233;box-shadow:0 0 0 2px var(--surface,#2a2a2a)}
 
   /* quick settings */
   #quick{width:340px;bottom:calc(var(--tb-h) + 10px);right:8px;padding:18px}
