@@ -19,6 +19,7 @@ const APPS = {
   snake:     {title:"Snake",         icon:"🐍", w:440, h:520, build:buildSnake},
   archive:   {title:"Archive",       icon:"🗜️", w:560, h:420, build:buildArchive, hidden:true},
   htmlview:  {title:"HTML Viewer",   icon:"🌐", w:760, h:560, build:buildHtmlView, hidden:true},
+  batch:     {title:"cmd.exe",       icon:"⬛", w:640, h:400, build:buildBatch, hidden:true},
 };
 const PINNED = ["edge","explorer","notepad","docs","calc","photos","settings","terminal","defender","recycle"];
 const TASKBAR_PINS = ["explorer","edge","notepad","terminal"];
@@ -671,7 +672,7 @@ function buildTerminal(body){
     const node=()=>nodeAt(cwd);
     switch(c){
       case "": break;
-      case "help": printHtml(`<span class="cyan">Files:</span>  dir/ls  cd  pwd  cat/type  mkdir  tree<br><span class="cyan">System:</span> ver  date  time  whoami  hostname  ipconfig  neofetch  color  history  cls/clear  shutdown  exit<br><span class="cyan">Apps:</span>   start &lt;app&gt;  calc  notepad  edge  (or any app id)<br><span class="cyan">Fun:</span>    echo  cowsay  matrix  winget  fortune  sudo`); break;
+      case "help": printHtml(`<span class="cyan">Files:</span>  dir/ls  cd  pwd  cat/type  mkdir  del/erase  tree  &lt;script&gt;.bat<br><span class="cyan">System:</span> ver  date  time  whoami  hostname  ipconfig  neofetch  color  history  cls/clear  shutdown  exit<br><span class="cyan">Apps:</span>   start &lt;app&gt;  calc  notepad  edge  (or any app id)<br><span class="cyan">Fun:</span>    echo  cowsay  matrix  winget  fortune  sudo`); break;
       case "cls": case "clear": term.innerHTML=""; break;
       case "ver": print("WinClone [Version 10.0.26100]"); break;
       case "date": print(new Date().toLocaleDateString()); break;
@@ -709,6 +710,12 @@ function buildTerminal(body){
         if(n.children[a]){ print("Already exists."); break; }
         n.children[a]={folder:true,children:{}}; saveFS(); refreshFX(); print("Created "+a); break;
       }
+      case "del": case "erase": {
+        if(!a){ print("The syntax of the command is incorrect."); break; }
+        const r=batDelete(cwd, a.replace(/^\/[a-z]\s+/i,""));
+        if(r.err) printHtml(`Could Not Find <b>${esc(a)}</b>`);
+        break;
+      }
       case "tree": {
         let out="";(function w(p,pre){ const k=Object.keys((nodeAt(p)||{}).children||{}); k.forEach((name,i)=>{ const last=i===k.length-1, it=nodeAt(p).children[name]; out+=pre+(last?"└─ ":"├─ ")+(it.folder?"📁 ":"")+name+"\n"; if(it.folder) w([...p,name],pre+(last?"   ":"│  ")); }); })(cwd,""); print(out||"(empty)"); break;
       }
@@ -729,12 +736,143 @@ function buildTerminal(body){
       case "shutdown": print("Shutting down…"); setTimeout(()=>{ closeWin("terminal"); doShutdown(); },500); break;
       case "start": case "open": if(APPS[args[0]]) openApp(args[0]); else print("Unknown app: "+(a||"")); break;
       case "exit": closeWin("terminal"); break;
-      default:
+      default: {
         if(APPS[c]){ openApp(c); break; }
+        const kids=(node()||{}).children||{}, tok=parts[0];
+        const bn = (kids[tok]&&!kids[tok].folder) ? tok : (kids[tok+".bat"]?tok+".bat":kids[tok+".cmd"]?tok+".cmd":null);
+        if(bn && /\.(bat|cmd)$/i.test(bn)){ openBatch({path:[...cwd],name:bn}); break; }
         printHtml(`'${esc(c)}' is not recognized as an internal or external command,<br>operable program or batch file.`);
+      }
     }
   }
   prompt();
+}
+
+/* ============================ BATCH SCRIPT RUNNER (.bat / .cmd) ============================ */
+let BAT_PENDING=null; const BAT={loader:null};
+function openBatch(pn){
+  if(state.wins.batch && BAT.loader){ if(state.wins.batch.min) toggleMin("batch",false); focusWin("batch"); BAT.loader(pn); }
+  else { BAT_PENDING=pn; openApp("batch"); }
+}
+function buildBatch(body,win,rec){
+  body.innerHTML=`<div class="term batcon"></div>`;
+  const con=body.querySelector(".batcon");
+  const setTitle=t=>{ const tt=win.querySelector(".tt"); if(tt) tt.textContent=t; };
+  const print=(t,cls)=>{ const d=el("div",cls||""); d.textContent=t==null?"":String(t); con.appendChild(d); con.scrollTop=con.scrollHeight; };
+  const printHtml=h=>{ const d=el("div"); d.innerHTML=h; con.appendChild(d); con.scrollTop=con.scrollHeight; };
+  let runGen=0;
+  function load(pn){
+    con.innerHTML="";
+    const myGen=++runGen;                                  // invalidates any still-running previous script
+    const node=nodeAt(pn.path), item=node&&node.children&&node.children[pn.name];
+    if(!item){ print("The system cannot find the file: "+pn.name); return; }
+    if(item.web){ print("Access is denied. This script was downloaded from the internet and WinClone will not run it."); return; }
+    setTitle(pn.name);
+    runBatchScript(String(item.content||""), [...pn.path], {
+      con, print, printHtml, setTitle,
+      alive:()=>document.body.contains(con)&&runGen===myGen,
+      close:()=>closeWin("batch")
+    });
+  }
+  BAT.loader=load;
+  if(BAT_PENDING){ load(BAT_PENDING); BAT_PENDING=null; }
+}
+/* Interprets a batch script line-by-line against the VFS. Supports the common subset:
+   @, echo on/off, echo, rem/::, del/erase, rd/rmdir, md/mkdir, cd, cls, title, color,
+   pause, timeout, start, exit, and labels. Unknown commands report like real cmd. */
+function runBatchScript(text, cwd, io){
+  const lines=text.split(/\r?\n/);
+  let echo=true, i=0;
+  const promptStr=()=> "C:\\"+cwd.slice(1).join("\\")+">";
+  const sched=(ms)=>{ if(io.alive()) setTimeout(step, ms==null?45:ms); };
+  function finish(){ /* leave the window open showing output */ }
+
+  function step(){
+    if(!io.alive()) return;
+    if(i>=lines.length){ finish(); return; }
+    let raw=lines[i++].replace(/\s+$/,"");
+    let cmd=raw.replace(/^\s+/,"");
+    if(cmd===""){ sched(8); return; }
+    let atSil=false;
+    if(cmd[0]==="@"){ atSil=true; cmd=cmd.slice(1).replace(/^\s+/,""); }
+    if(cmd[0]===":"){ sched(8); return; }               // label (::comment or :label)
+    if(echo && !atSil) io.print(promptStr()+cmd);
+    exec(cmd);
+  }
+
+  function exec(cmd){
+    if(/^echo[.:]/i.test(cmd)){ io.print(cmd.slice(5)); sched(); return; }   // echo. / echo: (blank or glued text)
+    const sp=cmd.indexOf(" ");
+    const word=(sp<0?cmd:cmd.slice(0,sp)).toLowerCase();
+    const rest=(sp<0?"":cmd.slice(sp+1)).trim();
+    switch(word){
+      case "rem": break;
+      case "echo": {
+        const low=rest.toLowerCase();
+        if(low==="off"){ echo=false; break; }
+        if(low==="on"){ echo=true; break; }
+        if(rest==="") io.print("ECHO is "+(echo?"on":"off")+".");
+        else io.print(rest);
+        break;
+      }
+      case "cls": io.con.innerHTML=""; break;
+      case "title": io.setTitle(rest||"cmd.exe"); break;
+      case "color": break;
+      case "pause": {
+        io.print("Press any key to continue . . .");
+        const go=()=>{ window.removeEventListener("keydown",kh,true); io.con.removeEventListener("click",go); sched(); };
+        const kh=e=>go();
+        window.addEventListener("keydown",kh,true); io.con.addEventListener("click",go);
+        return;                                            // wait; don't auto-schedule
+      }
+      case "timeout": {
+        let n=2; const m=rest.match(/\/t\s+(\d+)/i)||rest.match(/^(\d+)/); if(m) n=Math.min(9,parseInt(m[1],10)||0);
+        io.print("Waiting for "+n+" second(s)…");
+        sched(Math.max(200,n*1000)); return;
+      }
+      case "del": case "erase": {
+        if(!rest){ io.print("The syntax of the command is incorrect."); break; }
+        const r=batDelete(cwd, rest.replace(/^\/[a-z]\s+/i,""));
+        if(r.err) io.print("Could Not Find "+rest);
+        break;                                             // success is silent, like real del
+      }
+      case "rd": case "rmdir": {
+        const recursive=/\/s\b/i.test(rest);
+        const target=rest.replace(/\/[a-z]\b/ig,"").trim();
+        const r=batRmdir(cwd, target, recursive);
+        if(r.err==="notdir") io.print("The system cannot find the file specified.");
+        else if(r.err==="notempty") io.print("The directory is not empty.");
+        break;
+      }
+      case "md": case "mkdir": {
+        if(!rest){ io.print("The syntax of the command is incorrect."); break; }
+        const segs=batResolve(cwd, rest), name=segs[segs.length-1], parent=nodeAt(segs.slice(0,-1));
+        if(!parent||!parent.children){ io.print("The system cannot find the path specified."); break; }
+        if(parent.children[name]){ io.print("A subdirectory or file "+name+" already exists."); break; }
+        parent.children[name]={folder:true,children:{}}; saveFS(); refreshFX();
+        break;
+      }
+      case "cd": case "chdir": {
+        let arg=rest.replace(/^\/d\s+/i,"").trim();
+        if(!arg){ io.print(promptStr().slice(0,-1)); break; }
+        const segs=batResolve(cwd, arg), n=nodeAt(segs);
+        if(n&&n.folder){ cwd=segs; } else io.print("The system cannot find the path specified.");
+        break;
+      }
+      case "start": {
+        const id=(rest.split(/\s+/)[0]||"").toLowerCase();
+        if(APPS[id]) openApp(id); else io.print("The system cannot find the file specified.");
+        break;
+      }
+      case "exit": io.close(); return;
+      case "set": case "if": case "for": case "goto": case "setlocal": case "endlocal": case "call": case "pushd": case "popd": break;
+      default:
+        if(APPS[word]){ openApp(word); break; }
+        io.printHtml(`'${esc(word)}' is not recognized as an internal or external command,<br>operable program or batch file.`);
+    }
+    sched();
+  }
+  step();
 }
 
 /* ============================ VIRTUAL FILESYSTEM (persistent) ============================ */
@@ -1020,12 +1158,15 @@ function fsOpen(path,name,item){
   else if(isImg) openImageInPhotos({path:[...path],name});
   else if(isVid || isAud) openMediaIn({path:[...path],name});
   else if(/\.(wcdocs?|docx?|odt|rtf)$/.test(lo)) openDocs({path:[...path],name});
+  else if(/\.(bat|cmd)$/.test(lo)) openBatch({path:[...path],name});
   else if(item.exe||item.malware||lo.endsWith(".exe")) runFile(name,item);
   else openFileInNotepad({path:[...path],name}); // txt, md, json, log, rtf, csv, ini, bat, unknown-with-content
 }
 /* context menu for a file/folder, reused by Explorer + Desktop */
 function fsItemMenu(x,y,path,name,item,extra){
   const items=[{icon:"📂",label:"Open",action:()=>fsOpen(path,name,item)}];
+  if(/\.(bat|cmd)$/i.test(name) && !item.web)
+    items.push({icon:"📝",label:"Edit",action:()=>openFileInNotepad({path:[...path],name})});
   if(!item.sys) items.push({icon:"📤",label:"Export (save to computer)…",action:()=>exportFile(path,name,item)});
   if(/\.(png|jpe?g|gif|bmp)$/i.test(name) && !item.locked)
     items.push({icon:"🖼️",label:"Set as wallpaper",action:()=>setWallpaper(artFor(name,item).g)});
@@ -1080,6 +1221,47 @@ function restoreFromRecycle(idx){
   if(parent&&parent.children) parent.children[r.name]=r.item;
   RECYCLE.splice(idx,1);
   saveFS(); saveRecycle(); refreshFX(); applySystemHealth();
+}
+
+/* ============================ PATH RESOLUTION (for del / batch) ============================ */
+/* cwd is a drive-rooted segment array, e.g. ["C:","Users","User","Desktop"].
+   Returns a normalized drive-rooted segment array for a cmd-style path argument. */
+function batResolve(cwd, arg){
+  arg=String(arg||"").trim().replace(/^"(.*)"$/,"$1").replace(/[\\/]+$/,"");
+  const split=s=>s.split(/[\\/]+/).filter(x=>x!=="");
+  let segs;
+  if(/^[A-Za-z]:/.test(arg))      segs=[arg.slice(0,2).toUpperCase(), ...split(arg.slice(2))]; // absolute w/ drive
+  else if(/^[\\/]/.test(arg))     segs=[cwd[0], ...split(arg)];                                 // drive-root relative
+  else                            segs=[...cwd, ...split(arg)];                                 // cwd relative
+  const out=[];
+  for(const s of segs){ if(s==="."||s==="") continue; else if(s===".."){ if(out.length>1) out.pop(); } else out.push(s); }
+  return out.length?out:[cwd[0]];
+}
+function wildRe(pat){
+  return new RegExp("^"+pat.split("").map(ch=> ch==="*"?".*":ch==="?"?".":ch.replace(/[.+^${}()|[\]\\]/g,"\\$&")).join("")+"$","i");
+}
+/* Delete file(s) matching a cmd-style target. Routes through deleteAt (recycles + system-health/BSOD). */
+function batDelete(cwd, rawArg){
+  const segs=batResolve(cwd, rawArg);
+  const name=segs[segs.length-1], parentPath=segs.slice(0,-1);
+  const parent=nodeAt(parentPath);
+  if(!parent||!parent.children) return {err:"path"};
+  const all=/^\*(\.\*)?$/.test(name);
+  const re=all?null:wildRe(name);
+  const victims=Object.keys(parent.children).filter(k=>{ const it=parent.children[k]; return !it.folder && (all||re.test(k)); });
+  if(!victims.length) return {err:"notfound"};
+  victims.forEach(k=>deleteAt(parentPath,k));
+  return {deleted:victims};
+}
+/* Remove a folder (rd / rmdir). /s allows non-empty removal. */
+function batRmdir(cwd, rawArg, recursive){
+  const segs=batResolve(cwd, rawArg);
+  const name=segs[segs.length-1], parentPath=segs.slice(0,-1);
+  const parent=nodeAt(parentPath), it=parent&&parent.children&&parent.children[name];
+  if(!it||!it.folder) return {err:"notdir"};
+  if(!recursive && it.children && Object.keys(it.children).length) return {err:"notempty"};
+  deleteAt(parentPath,name);
+  return {ok:true};
 }
 
 /* ============================ DIALOG ENGINE ============================ */
