@@ -686,7 +686,7 @@ function buildTerminal(body){
     const node=()=>nodeAt(cwd);
     switch(c){
       case "": break;
-      case "help": printHtml(`<span class="cyan">Files:</span>  dir/ls  cd  pwd  cat/type  mkdir  del/erase  tree  &lt;script&gt;.bat<br><span class="cyan">System:</span> ver  winver  date  time  whoami  hostname  ipconfig  neofetch  color  history  cls/clear  shutdown  exit<br><span class="cyan">Apps:</span>   start &lt;app&gt;  calc  notepad  edge  (or any app id)<br><span class="cyan">Fun:</span>    echo  cowsay  matrix  winget  fortune  sudo`); break;
+      case "help": printHtml(`<span class="cyan">Files:</span>  dir/ls  cd  pwd  cat/type  mkdir  del/erase  tree  &lt;script&gt;.bat<br><span class="cyan">System:</span> ver  winver  whatsnew  date  time  whoami  hostname  ipconfig  neofetch  color  history  cls/clear  shutdown  exit<br><span class="cyan">Apps:</span>   start &lt;app&gt;  calc  notepad  edge  (or any app id)<br><span class="cyan">Fun:</span>    echo  cowsay  matrix  winget  fortune  sudo`); break;
       case "cls": case "clear": term.innerHTML=""; break;
       case "ver": print("WinClone [Version 10.0.26100]"); break;
       case "winver":
@@ -696,6 +696,9 @@ function buildTerminal(body){
           Build ${esc(isHosted()?installedBuild():"local (file://)")}<br><br>
           © 2026 WinClone Megatrends, Inc.<br>
           <small style="color:#9a9a9a">The one operating system that lives in a single browser tab.</small></div>`});
+        break;
+      case "whatsnew":   // force-show the What's New screen (it normally appears once, after an update)
+        showWhatsNew(WC_VERSION, ()=>showToast({icon:"🎉",title:"That was the What's New screen",body:"It shows automatically once, the first time you sign in after an update."}));
         break;
       case "date": print(new Date().toLocaleDateString()); break;
       case "time": print(new Date().toLocaleTimeString()); break;
@@ -3283,7 +3286,7 @@ function showWhatsNew(version, done){
     <button class="wn-go">Let's go</button>
   </div>`;
   document.body.appendChild(ov);
-  requestAnimationFrame(()=>ov.classList.add("show"));
+  setTimeout(()=>ov.classList.add("show"),20);   // setTimeout (not rAF) so it reveals even in a background/non-painting tab
   const close=()=>{ ov.classList.remove("show"); setTimeout(()=>ov.remove(),260); if(done) done(); };
   ov.querySelector(".wn-go").onclick=close;
 }
