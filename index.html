@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WinClone</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- DESKTOP -->
+<div id="desktop" class="dark">
+  <div id="icons"></div>
+</div>
+
+<!-- TASKBAR -->
+<div id="taskbar">
+  <div id="tb-left">
+    <button class="tbtn" id="widgetsbtn" title="Widgets"><span class="gl">🌤️</span></button>
+  </div>
+  <div id="tb-center">
+    <button class="tbtn" id="startbtn" title="Start"><span class="gl">⊞</span></button>
+    <button class="tbtn" id="searchbtn" title="Search"><span class="gl">🔍</span></button>
+    <div id="tb-apps" style="display:flex;gap:4px"></div>
+  </div>
+  <div id="tb-right">
+    <button class="trayitem" id="chevron" title="Hidden icons"><span class="tray-ic">⌃</span></button>
+    <button class="trayitem" id="notifbtn" title="Notifications"><span class="tray-ic">🔔</span><span id="notif-badge"></span></button>
+    <button class="trayitem" id="quickbtn" title="Network / Sound / Battery">
+      <span class="tray-ic">📶</span><span class="tray-ic">🔊</span><span class="tray-ic">🔋</span>
+    </button>
+    <button class="trayitem" id="tray-clock">
+      <span id="clk-time">12:00 PM</span>
+      <small id="clk-date">1/1/2026</small>
+    </button>
+  </div>
+</div>
+
+<!-- START MENU -->
+<div id="startmenu" class="flyout">
+  <input id="start-search" placeholder="Search for apps, settings, and documents">
+  <div class="sm-head"><b>Pinned</b><button class="allbtn">All apps &nbsp;›</button></div>
+  <div class="sm-grid" id="sm-grid"></div>
+  <div id="startfoot">
+    <div class="sm-user"><div class="avatar">U</div><span>User</span></div>
+    <button id="powerbtn" title="Power">⏻</button>
+  </div>
+</div>
+
+<!-- QUICK SETTINGS -->
+<div id="quick" class="flyout">
+  <div class="qs-grid">
+    <div class="qs-tile on" data-q="wifi"><span class="gl">📶</span> Wi-Fi</div>
+    <div class="qs-tile" data-q="bt"><span class="gl">🔵</span> Bluetooth</div>
+    <div class="qs-tile" data-q="air"><span class="gl">✈️</span> Airplane</div>
+    <div class="qs-tile" data-q="save"><span class="gl">🔋</span> Battery saver</div>
+  </div>
+  <div class="qs-slider"><span>🔆</span><input type="range" min="0" max="100" value="80" id="bright"></div>
+  <div class="qs-slider"><span id="vol-ic">🔊</span><input type="range" min="0" max="100" value="65" id="vol"></div>
+  <div id="wifilist"></div>
+</div>
+
+<!-- CALENDAR -->
+<div id="cal" class="flyout">
+  <div class="cbig" id="cal-time">12:00:00 PM</div>
+  <div class="cdate" id="cal-date">Wednesday, July 8, 2026</div>
+  <div class="cal-grid" id="cal-grid"></div>
+</div>
+
+<!-- NOTIFICATION CENTER -->
+<div id="notif" class="flyout">
+  <div class="notif-head"><b>Notifications</b><button class="allbtn" id="notif-clear">Clear all</button></div>
+  <div id="notif-list"></div>
+</div>
+
+<!-- TOASTS -->
+<div id="toasts"></div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx"></div>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="clock-big" id="lg-time">12:00</div>
+  <div class="date-big" id="lg-date">Wednesday, July 8</div>
+  <div class="lg-user">
+    <div class="avatar-lg">U</div>
+    <div class="lg-name">User</div>
+    <div class="lg-row">
+      <input id="lg-pass" type="password" placeholder="PIN or password" autocomplete="off">
+      <button class="go" id="lg-go">→</button>
+    </div>
+    <div class="hint">Press → or Enter to sign in (any value works)</div>
+  </div>
+  <button class="bios-lgbtn" id="biosbtn">⚙ BIOS Setup</button>
+</div>
+
+<!-- SHUTDOWN -->
+<div id="shutdown"><div class="spin"></div><div id="sd-text">Shutting down…</div></div>
+
+<!-- SCREEN SAVER -->
+<div id="screensaver"><div class="ss-logo">WinClone</div></div>
+
+<!-- UPDATE -->
+<div id="update">
+  <div class="spin"></div>
+  <div class="upd-title">Working on updates</div>
+  <div id="upd-pct">0% complete</div>
+  <div id="upd-msg">Getting things ready</div>
+  <div class="upd-warn">Don't turn off your PC. This will take a while.</div>
+</div>
+
+<!-- BSOD -->
+<div id="bsod">
+  <div class="sad">:(</div>
+  <div class="t1">Your PC ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.</div>
+  <div class="pct"><span id="bsod-pct">0</span>% complete</div>
+  <div class="code">Stop code: <span id="bsod-code">CRITICAL_PROCESS_DIED</span><br>
+    What failed: <span id="bsod-what">systemwinclone.sys</span><br><br>
+    Tip: you can factory-reset WinClone from the “⚙ BIOS Setup” button on the sign-in screen.</div>
+</div>
+
+<!-- hidden real-file import input -->
+<input type="file" id="fileimport" accept="image/*" multiple style="display:none">
+
+<!-- MALWARE OVERLAYS -->
+<div id="heat"></div>
+<div id="ransom"></div>
+
+<!-- RECOVERY (WinRE) -->
+<div id="recovery"></div>
+
+<!-- BIOS -->
+<div id="bios">
+  <div class="bios-head">WinClone BIOS Setup Utility — American Clonetrends v4.8</div>
+  <div class="bios-tabs"><span class="act">Main</span><span>Advanced</span><span>Boot</span><span>Exit</span></div>
+  <div class="bios-body">
+    <div style="flex:1">
+      <div class="bios-opt">System Time ......... <span id="bios-time">--:--:--</span></div>
+      <div class="bios-opt">System Date ......... <span id="bios-date">--/--/----</span></div>
+      <div class="bios-opt">Processor ........... WinClone Core i9 @ 3.60GHz</div>
+      <div class="bios-opt">Installed Memory .... 32768 MB OK</div>
+      <div class="bios-opt">System Health ....... <span id="bios-health">OK</span></div>
+      <br>
+      <div class="bios-opt hotable" id="bios-reset">&gt; Restore Factory Defaults (wipe &amp; reinstall WinClone)</div>
+      <div class="bios-opt hotable" id="bios-exit">&gt; Exit Without Saving</div>
+    </div>
+    <div class="bios-side">←→ Select Screen<br>↑↓ Select Item<br>Enter: Select<br>Esc: Exit<br><br>
+      <b>Restore Factory Defaults</b> erases all files, downloads, settings and infections, and reinstalls WinClone system files. Use this if the system is corrupted.</div>
+  </div>
+  <div class="bios-foot">v4.8 (C)Copyright 2026, WinClone Megatrends, Inc.</div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
