@@ -1,4 +1,18 @@
 "use strict";
+/* ============================ VERSION ============================
+   Bump WC_VERSION every release and add a matching WC_CHANGELOG entry.
+   After an update, the new version's changelog is shown once on the next
+   sign-in ("What's new"), and `winver` in the Terminal reports the version. */
+const WC_VERSION = "1.0.0";
+const WC_CHANGELOG = {
+  "1.0.0": [
+    "🎉 Version numbers arrive — check yours anytime by typing winver in the Terminal.",
+    "📜 Batch files run: double-click a .bat (or run it in the Terminal), with a real del command.",
+    "🔄 Manual updates — install new versions from Start ▸ Power ▸ Update and restart.",
+    "✨ This What's New screen, shown once after each update.",
+  ],
+};
+
 /* ============================ APP REGISTRY ============================ */
 const APPS = {
   explorer:  {title:"File Explorer", icon:"📁", w:760, h:500, build:buildExplorer},
@@ -662,7 +676,7 @@ function buildTerminal(body){
   function neofetch(){
     const up=Math.floor((Date.now()-TERM_START)/1000), um=Math.floor(up/60);
     const L=["        ","▛▀▀▜ ▛▀▀▜","▙▄▄▟ ▙▄▄▟","▛▀▀▜ ▛▀▀▜","▙▄▄▟ ▙▄▄▟","        "];
-    const I=[`${getUser()}@WINCLONE-PC`,"—".repeat(18),"OS: WinClone 12 Pro 24H2","Host: WinClone Megatrends","Kernel: winclone_kernel.dll","Shell: WinTerminal 10.0","Resolution: "+innerWidth+"x"+innerHeight,"CPU: WinClone Core i9 @ 3.6GHz","Memory: "+(6144+rnd(2048))+"MiB / 32768MiB","Uptime: "+um+"m "+(up%60)+"s"];
+    const I=[`${getUser()}@WINCLONE-PC`,"—".repeat(18),"OS: WinClone 12 Pro 24H2 (v"+WC_VERSION+")","Host: WinClone Megatrends","Kernel: winclone_kernel.dll","Shell: WinTerminal 10.0","Resolution: "+innerWidth+"x"+innerHeight,"CPU: WinClone Core i9 @ 3.6GHz","Memory: "+(6144+rnd(2048))+"MiB / 32768MiB","Uptime: "+um+"m "+(up%60)+"s"];
     let out="";
     for(let i=0;i<Math.max(L.length,I.length);i++){ out+=`<span class="cyan">${(L[i]||"          ").padEnd(11)}</span>${esc(I[i]||"")}\n`; }
     return out;
@@ -672,9 +686,17 @@ function buildTerminal(body){
     const node=()=>nodeAt(cwd);
     switch(c){
       case "": break;
-      case "help": printHtml(`<span class="cyan">Files:</span>  dir/ls  cd  pwd  cat/type  mkdir  del/erase  tree  &lt;script&gt;.bat<br><span class="cyan">System:</span> ver  date  time  whoami  hostname  ipconfig  neofetch  color  history  cls/clear  shutdown  exit<br><span class="cyan">Apps:</span>   start &lt;app&gt;  calc  notepad  edge  (or any app id)<br><span class="cyan">Fun:</span>    echo  cowsay  matrix  winget  fortune  sudo`); break;
+      case "help": printHtml(`<span class="cyan">Files:</span>  dir/ls  cd  pwd  cat/type  mkdir  del/erase  tree  &lt;script&gt;.bat<br><span class="cyan">System:</span> ver  winver  date  time  whoami  hostname  ipconfig  neofetch  color  history  cls/clear  shutdown  exit<br><span class="cyan">Apps:</span>   start &lt;app&gt;  calc  notepad  edge  (or any app id)<br><span class="cyan">Fun:</span>    echo  cowsay  matrix  winget  fortune  sudo`); break;
       case "cls": case "clear": term.innerHTML=""; break;
       case "ver": print("WinClone [Version 10.0.26100]"); break;
+      case "winver":
+        winDialog({icon:"🪟",title:"About WinClone",
+          msg:`<div style="line-height:1.55"><b>WinClone</b> 12 Pro<br>
+          Version <b>${esc(WC_VERSION)}</b><br>
+          Build ${esc(isHosted()?installedBuild():"local (file://)")}<br><br>
+          © 2026 WinClone Megatrends, Inc.<br>
+          <small style="color:#9a9a9a">The one operating system that lives in a single browser tab.</small></div>`});
+        break;
       case "date": print(new Date().toLocaleDateString()); break;
       case "time": print(new Date().toLocaleTimeString()); break;
       case "whoami": print("winclone\\"+getUser().toLowerCase().replace(/\s+/g,"")); break;
@@ -3249,6 +3271,22 @@ function runUpdateScreen(done){
     if(p>=100){ clearInterval(iv); setTimeout(()=>{ u.style.display="none"; done(); },1000); }
   },220);
 }
+/* "What's new" — shown once after an update (see the version check in doSignIn). */
+function showWhatsNew(version, done){
+  const changes = WC_CHANGELOG[version] || ["Various improvements and fixes."];
+  const ov=el("div","whatsnew");
+  ov.innerHTML=`<div class="wn-card">
+    <div class="wn-emoji">🎉</div>
+    <div class="wn-h">What's new in WinClone</div>
+    <div class="wn-sub">You're now running version ${esc(version)}</div>
+    <ul class="wn-list">${changes.map(c=>`<li>${esc(c)}</li>`).join("")}</ul>
+    <button class="wn-go">Let's go</button>
+  </div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(()=>ov.classList.add("show"));
+  const close=()=>{ ov.classList.remove("show"); setTimeout(()=>ov.remove(),260); if(done) done(); };
+  ov.querySelector(".wn-go").onclick=close;
+}
 
 /* login */
 function signIn(){ doSignIn(); }
@@ -3260,6 +3298,13 @@ function doSignIn(){
   ssArm();
   notify({icon:"👋",title:"Welcome back, "+getUser(),body:"You're signed in to WinClone."});
   setTimeout(()=>checkForUpdates({notify:true}), 3000);   // quietly look for a new version after login
+  /* If the running version is newer than what we last showed, we just updated:
+     reveal "What's new" once, then a confirmation toast. */
+  const seen=localStorage.getItem("wc_seen_version");
+  try{ localStorage.setItem("wc_seen_version", WC_VERSION); }catch(e){}
+  if(seen && seen!==WC_VERSION){
+    setTimeout(()=>showWhatsNew(WC_VERSION, ()=>showToast({icon:"🎉",title:"Update complete",body:"Now running WinClone v"+WC_VERSION+"."})), 900);
+  }
   const st=systemStatus();
   if(st.critical){
     setTimeout(()=>winDialog({icon:"❌",title:"WinClone — Critical",
