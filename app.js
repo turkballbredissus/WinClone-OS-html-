@@ -18,8 +18,14 @@
    Bump WC_VERSION every release and add a matching WC_CHANGELOG entry.
    After an update, the new version's changelog is shown once on the next
    sign-in ("What's new"), and `winver` in the Terminal reports the version. */
-const WC_VERSION = "2.0.0";
+const WC_VERSION = "2.0.2";
 const WC_CHANGELOG = {
+  "2.0.2": [
+    "🔎 winclone.search_file(\"notes.txt\") — Python can search the whole disk now and get back a list of full paths. Part of a name works, and so do wildcards: search_file(\"*.py\") finds every script you own.",
+    "🛑 winclone.terminate_task(\"Notepad\") — a script can end a running task. Names aren't fussy about case, and part of a name is enough.",
+    "📋 winclone.tasks() — everything Task Manager is showing, as a list, so a script can look before it kills.",
+    "🛡️ Scripts get the same rules the End task button does: system processes are refused, and malware refuses too — a rootkit just respawns it, so that's still Cork Defender's job.",
+  ],
   "2.0.0": [
     "📧 WinClone Mail. Every account gets a real address — the name from the email you signed up with, in front of @winclone.com — and you can mail any other WinClone user. Open it once to pick your address; you don't have to use your real name.",
     "📬 Mail arrives live. No refreshing: a message lands with a notification and a red badge on the taskbar while you're doing something else.",
@@ -5897,6 +5903,53 @@ function makeWincloneModule(io,fn){
     return name;
   });
   d.apps=fn("apps",()=>Object.keys(APPS).filter(k=>!APPS[k].hidden));
+
+  /* winclone.search_file("notes.txt") — walk every folder from C:\ down and
+     return the full path of everything that matches. The whole file system is
+     a few hundred nodes, so a full walk is instant and there's no index that
+     could go stale. Exact name wins; otherwise it falls back to "contains",
+     and a * anywhere switches it to glob matching ("*.py", "log*"). */
+  d.search_file=fn("search_file",(a)=>{
+    const q=(a.length?pyStr(a[0]):"").trim().toLowerCase();
+    if(!q) throw pyErr("ValueError","give it a name to look for, like winclone.search_file(\"notes.txt\")");
+    let rx=null;
+    if(q.indexOf("*")>=0){
+      const esc=q.replace(/[.+^${}()|[\]\\?]/g,"\\$&").replace(/\*/g,".*");
+      rx=new RegExp("^"+esc+"$");
+    }
+    const exact=[],loose=[];
+    (function walk(node,path){
+      Object.keys(node.children||{}).forEach(k=>{
+        const it=node.children[k],p=path.concat(k);
+        if(it.folder){ walk(it,p); return; }
+        const lc=k.toLowerCase();
+        if(rx){ if(rx.test(lc)) exact.push(p.join("\\")); }
+        else if(lc===q) exact.push(p.join("\\"));
+        else if(lc.indexOf(q)>=0) loose.push(p.join("\\"));
+      });
+    })({children:VFS},[]);
+    return exact.concat(loose);
+  });
+  d._search_file=d.search_file;      // same thing, underscore or not
+
+  /* winclone.tasks() — what Task Manager is showing, as a list of names. */
+  d.tasks=fn("tasks",()=>runningTasks().map(t=>t.n));
+
+  /* winclone.terminate_task("Notepad") — ends it, with the same rules the
+     End task button follows: apps close, malware refuses (a rootkit respawns
+     it, that's Cork Defender's job), system processes are off limits. */
+  d.terminate_task=fn("terminate_task",(a)=>{
+    const raw=a.length?pyStr(a[0]).trim():"";
+    const want=raw.toLowerCase();
+    if(!want) throw pyErr("ValueError","which task? winclone.tasks() lists what's running");
+    const all=runningTasks();
+    const t=all.find(x=>x.n.toLowerCase()===want)||all.find(x=>x.n.toLowerCase().indexOf(want)>=0);
+    if(!t) throw pyErr("ValueError","nothing running called '"+raw+"' — winclone.tasks() lists what is");
+    if(t.mal) throw pyErr("PermissionError","'"+t.n+"' is protected by a rootkit and respawns instantly — Cork Defender removes it properly");
+    if(t.sys) throw pyErr("PermissionError","'"+t.n+"' is a system process; WinClone won't let a script end it");
+    closeWin(t.win);
+    return true;
+  });
   d.ls=fn("ls",(a)=>{
     const segs=a.length?resolve(pyStr(a[0])):home();
     const n=nodeAt(segs);
@@ -7655,6 +7708,14 @@ function pyHelpDialog(){
     <code>missing_ok=True</code> to shrug when it's already gone<br>
     <code>winclone.open_app(x)</code> (or <code>winclone.open</code>) — an app id opens the app,
     anything else opens that file or folder with whatever handles it<br>
+    <code>winclone.search_file("notes.txt")</code> — searches the <b>whole disk</b> and gives
+    back a list of full paths. Part of a name works too, and so do wildcards:
+    <code>search_file("*.py")</code><br>
+    <code>winclone.tasks()</code> — everything Task Manager is showing, as a list of names<br>
+    <code>winclone.terminate_task("Notepad")</code> — ends that task. Same rules as the
+    End task button: apps close, system processes are refused, and malware throws
+    <code>PermissionError</code> because a rootkit just respawns it — that one's
+    Cork Defender's job<br>
     <code>winclone.open_app("C:/Users/User/Music/song.mp3")</code> — opens a track in Media
     Player and <b>really plays it</b>, if you imported it from your computer
     (File Explorer ▸ right-click ▸ <i>Import files…</i>)<br>
@@ -10537,6 +10598,27 @@ function buildPaint(body){
 }
 
 /* ---- Task Manager ---- */
+/* One source of truth for what's running. Task Manager and the Python
+   winclone.tasks()/terminate_task() both read this, so they can't drift apart
+   and disagree about what exists or what's killable. */
+function runningTasks(){
+  const out=[
+    {n:"System",       i:"⚙️", sys:true},
+    {n:"wclogon.exe",  i:"🔐", sys:true},
+    {n:"explorer.exe", i:"📁", sys:true},
+    {n:"Cork Defender",i:"🛡️", sys:true},
+  ];
+  Object.keys(state.wins).forEach(id=>{ const a=APPS[id]; if(a) out.push({n:a.title,i:a.icon,win:id}); });
+  if(hasKind("miner"))     out.push({n:"BitCorkMiner.exe",i:"⛏️",mal:1});
+  if(hasKind("backdoor"))  out.push({n:"svch0st_rat.exe", i:"🚪",mal:1});
+  if(hasKind("keylogger")) out.push({n:"klog32.exe",      i:"⌨️",mal:1});
+  if(hasKind("spyware"))   out.push({n:"peepcam.exe",     i:"👁️",mal:1});
+  if(hasKind("scareware")) out.push({n:"adserver.exe",    i:"📢",mal:1});
+  const worms=wormCount();
+  for(let i=0;i<Math.min(worms,6);i++) out.push({n:"wcworm_"+i+".exe",i:"🪱",mal:1});
+  return out;
+}
+
 function buildTaskmgr(body){
   body.innerHTML=`<div class="tm">
     <div class="tm-sum">
@@ -10547,21 +10629,20 @@ function buildTaskmgr(body){
     <div class="tm-list"></div>
   </div>`;
   const list=body.querySelector(".tm-list"), cpuBar=body.querySelector("[data-cpu]"), memBar=body.querySelector("[data-mem]");
+  /* Names and what's killable come from runningTasks(); the numbers are
+     cosmetic and made up fresh each tick. */
+  const LOAD={
+    "System":[1,120], "wclogon.exe":[0,32], "explorer.exe":[1,210], "Cork Defender":[2,98],
+    "BitCorkMiner.exe":[82,340], "svch0st_rat.exe":[3,44], "klog32.exe":[1,18],
+    "peepcam.exe":[5,120], "adserver.exe":[2,70],
+  };
   function procs(){
-    const base=[
-      {n:"System",i:"⚙️",cpu:1,mem:120},
-      {n:"wclogon.exe",i:"🔐",cpu:0,mem:32},
-      {n:"explorer.exe",i:"📁",cpu:1+rnd(2),mem:210},
-      {n:"Cork Defender",i:"🛡️",cpu:2,mem:98},
-    ];
-    Object.keys(state.wins).forEach(id=>{ const a=APPS[id]; if(a) base.push({n:a.title,i:a.icon,cpu:1+rnd(5),mem:60+rnd(180),win:id}); });
-    if(hasKind("miner")) base.push({n:"BitCorkMiner.exe",i:"⛏️",cpu:82+rnd(15),mem:340+rnd(120),mal:1});
-    if(hasKind("backdoor")) base.push({n:"svch0st_rat.exe",i:"🚪",cpu:3+rnd(6),mem:44+rnd(30),mal:1});
-    if(hasKind("keylogger")) base.push({n:"klog32.exe",i:"⌨️",cpu:1,mem:18,mal:1});
-    if(hasKind("spyware")) base.push({n:"peepcam.exe",i:"👁️",cpu:5+rnd(8),mem:120,mal:1});
-    if(hasKind("scareware")) base.push({n:"adserver.exe",i:"📢",cpu:2,mem:70,mal:1});
-    const worms=wormCount(); for(let i=0;i<Math.min(worms,6);i++) base.push({n:"wcworm_"+i+".exe",i:"🪱",cpu:4+rnd(7),mem:20+rnd(20),mal:1});
-    return base;
+    return runningTasks().map(t=>{
+      const l=LOAD[t.n];
+      if(l) return Object.assign({},t,{cpu:l[0]+(t.mal?rnd(15):rnd(2)),mem:l[1]+(t.mal?rnd(120):0)});
+      if(t.mal) return Object.assign({},t,{cpu:4+rnd(7),mem:20+rnd(20)});   // worms
+      return Object.assign({},t,{cpu:1+rnd(5),mem:60+rnd(180)});           // open apps
+    });
   }
   function render(){
     if(!body.isConnected) return;
