@@ -18,8 +18,11 @@
    Bump WC_VERSION every release and add a matching WC_CHANGELOG entry.
    After an update, the new version's changelog is shown once on the next
    sign-in ("What's new"), and `winver` in the Terminal reports the version. */
-const WC_VERSION = "2.0.2";
+const WC_VERSION = "2.0.3";
 const WC_CHANGELOG = {
+  "2.0.3": [
+    "🛟 Restore points actually restore now. Rolling back appeared to do nothing at all — the files came straight back, malware and all. The snapshot was being written correctly and then immediately overwritten by the copy of the desktop still held in memory, a fraction of a second before the restart. Fixed, and tested against a machine deliberately infected first.",
+  ],
   "2.0.2": [
     "🔎 winclone.search_file(\"notes.txt\") — Python can search the whole disk now and get back a list of full paths. Part of a name works, and so do wildcards: search_file(\"*.py\") finds every script you own.",
     "🛑 winclone.terminate_task(\"Notepad\") — a script can end a running task. Names aren't fussy about case, and part of a name is enough.",
@@ -1566,6 +1569,17 @@ function rpRestore(id){
     const v=d[k];
     try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){}
   });
+  /* Writing the keys is only half of it. VFS, RECYCLE, INFECTIONS and ICONPOS
+     are held in memory and still contain the infected desktop, and the very
+     next saveFS() — which pcPush() calls on its way out — would serialise that
+     back over everything we just restored, before the reload even happens.
+     That is why restoring appeared to do nothing at all. Reload the memory
+     copies from the keys we just wrote. */
+  try{ loadState(); }catch(e){}
+  try{ ICONPOS=JSON.parse(localStorage.getItem(IPOS_KEY))||{}; }catch(e){ ICONPOS={}; }
+  try{ NOTIFS=JSON.parse(localStorage.getItem("wc_notifs"))||[]; }catch(e){ NOTIFS=[]; }
+  try{ INFECTIONS=(INFECTIONS||[]).map(x=>typeof x==="string"?{name:x,kind:"scareware"}:x)
+        .filter(x=>x&&x.kind); }catch(e){}
   return true;
 }
 
