@@ -18,8 +18,13 @@
    Bump WC_VERSION every release and add a matching WC_CHANGELOG entry.
    After an update, the new version's changelog is shown once on the next
    sign-in ("What's new"), and `winver` in the Terminal reports the version. */
-const WC_VERSION = "2.0.3";
+const WC_VERSION = "2.1.0";
 const WC_CHANGELOG = {
+  "2.1.0": [
+    "🐍 Python scripts run side by side. Opening a second .py used to take over the first one's window and kill whatever was running in it — now every script gets its own window and they all keep going at once.",
+    "📊 Every script shows up under its own name. Task Manager, the taskbar, Task View and Alt+Tab all say wackhammer.py instead of a row of identical \"Python\" entries, so you can tell which is which — and end the right one.",
+    "🛑 winclone.terminate_task(\"wackhammer.py\") ends one script and leaves the rest running.",
+  ],
   "2.0.3": [
     "🛟 Restore points actually restore now. Rolling back appeared to do nothing at all — the files came straight back, malware and all. The snapshot was being written correctly and then immediately overwritten by the copy of the desktop still held in memory, a fraction of a second before the restart. Fixed, and tested against a machine deliberately infected first.",
   ],
@@ -220,21 +225,30 @@ function sfx(kind){
 /* mru = most-recently-used window order, newest first (drives Alt+Tab).
    Virtual desktops live in VD (see the TASK VIEW section); every window
    record carries a .vd telling it which desktop it belongs to. */
-const state = {z:20, wins:{}, focused:null, mru:[]};
+const state = {z:20, wins:{}, focused:null, mru:[], inst:0};
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 function el(tag, cls, html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;}
 const deskArea = () => ({w:innerWidth, h:innerHeight-40});   // 40 = taskbar height (--tb-h)
 
 /* ============================ WINDOW MANAGER ============================ */
-function openApp(id){
+/* Windows are keyed by app id, one each — open Notepad twice and you get the
+   one you already had. Pass {instance:true} and it gets its own key instead
+   ("pyrun#3"), so two Python scripts can run side by side without one closing
+   the other. rec.appId stays the real app id so APPS lookups keep working;
+   winApp() below is the safe way to go from a window key back to its app. */
+function openApp(id,opts){
+  opts=opts||{};
   const app = APPS[id]; if(!app) return;
-  if(state.wins[id]){
-    const w=state.wins[id];
+  const key = opts.instance ? id+"#"+(++state.inst) : id;
+  if(state.wins[key]){
+    const w=state.wins[key];
     if(w.vd!==VD.cur) switchDesktop(w.vd);      // already open on another desktop — go to it
-    if(w.min) toggleMin(id,false);
-    focusWin(id); return;
+    if(w.min) toggleMin(key,false);
+    focusWin(key); return key;
   }
+  const id0=id;
+  id=key;                                        // everything below keys off the instance
 
   const win = el("div","window"); win.dataset.app=id;
   const area = deskArea();
@@ -246,7 +260,7 @@ function openApp(id){
 
   win.innerHTML = `
     <div class="titlebar">
-      <div class="tb-title"><span class="ic">${app.icon}</span><span class="tt">${app.title}</span></div>
+      <div class="tb-title"><span class="ic">${app.icon}</span><span class="tt">${esc(opts.title||app.title)}</span></div>
       <div class="tb-controls">
         <button class="tb-btn min" title="Minimize"><svg viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.2"/></svg></button>
         <button class="tb-btn max" title="Maximize"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
@@ -257,7 +271,7 @@ function openApp(id){
   ["n","s","e","w","ne","nw","se","sw"].forEach(d=>{const h=el("div","rz rz-"+d);h.dataset.dir=d;win.appendChild(h);});
   $("#desktop").appendChild(win);
 
-  const rec = {el:win, appId:id, min:false, max:false, prev:null, vd:VD.cur};
+  const rec = {el:win, appId:id0, key:id, min:false, max:false, prev:null, vd:VD.cur};
   state.wins[id]=rec;
 
   app.build(win.querySelector(".window-body"), win, rec);
@@ -273,6 +287,13 @@ function openApp(id){
   requestAnimationFrame(()=>win.classList.add("show"));
   addTaskItem(id);
   focusWin(id);
+  return id;
+}
+
+/* window key -> its app. Instance keys look like "pyrun#3". */
+function winApp(key){
+  const rec=state.wins[key];
+  return APPS[rec?rec.appId:key]||null;
 }
 
 function focusWin(id){
@@ -399,9 +420,10 @@ function addTaskItem(id){
   const c = $("#tb-apps");
   let b = c.querySelector(`[data-app="${id}"]`);
   if(!b){
+    const a=winApp(id)||APPS[id]; if(!a) return;
     b = el("button","tbtn"); b.dataset.app=id;
-    b.innerHTML = `<span class="gl">${APPS[id].icon}</span>`;
-    b.title = APPS[id].title;
+    b.innerHTML = `<span class="gl">${a.icon}</span>`;
+    b.title = winTitleOf(id);
     b.onclick = ()=>taskClick(id);
     c.appendChild(b);
   }
@@ -515,7 +537,7 @@ function moveWinToDesktop(id,d){
 
 function winTitleOf(id){
   const r=state.wins[id], t=r&&r.el.querySelector(".tt");
-  return (t&&t.textContent&&t.textContent.trim()) || (APPS[id]?APPS[id].title:id);
+  return (t&&t.textContent&&t.textContent.trim()) || (winApp(id)?winApp(id).title:id);
 }
 function winThumb(rec, maxW, maxH){
   const src=rec.el;
@@ -562,7 +584,7 @@ function renderTaskView(){
     const card=el("div","tv-card"+(state.focused===id?" cur":""));
     card.dataset.app=id;
     card.appendChild(el("div","tv-cap",
-      `<span class="gl">${APPS[id]?APPS[id].icon:"🪟"}</span><span class="nm">${esc(winTitleOf(id))}</span>`));
+      `<span class="gl">${winApp(id)?winApp(id).icon:"🪟"}</span><span class="nm">${esc(winTitleOf(id))}</span>`));
     const x=el("button","tv-x","✕"); x.title="Close";
     x.onclick=e=>{ e.stopPropagation(); closeWin(id); };
     card.appendChild(x);
@@ -640,7 +662,7 @@ function altRender(){
   box.innerHTML="";
   ALT.list.forEach((id,i)=>{
     const it=el("div","alt-item"+(i===ALT.idx?" sel":""),
-      `<span class="ai">${APPS[id]?APPS[id].icon:"🪟"}</span><span class="an">${esc(winTitleOf(id))}</span>`);
+      `<span class="ai">${winApp(id)?winApp(id).icon:"🪟"}</span><span class="an">${esc(winTitleOf(id))}</span>`);
     it.addEventListener("mouseenter",()=>{ ALT.idx=i; altRender(); });
     it.addEventListener("mousedown",e=>{ e.preventDefault(); ALT.idx=i; altCommit(); });
     box.appendChild(it);
@@ -7556,14 +7578,16 @@ function buildPython(body,win){
 
 /* ============================ PYTHON FILE RUNNER ============================ */
 let PYRUN_PENDING=null;
-const PYRUN={loader:null};
+/* One window per script. Running a second .py used to hijack the first one's
+   window and kill whatever was already going; now they run side by side, each
+   named after its own file so Task Manager can tell them apart. */
 function openPyFile(pn){
-  if(state.wins.pyrun && PYRUN.loader){
-    if(state.wins.pyrun.min) toggleMin("pyrun",false);
-    focusWin("pyrun"); PYRUN.loader(pn);
-  } else { PYRUN_PENDING=pn; openApp("pyrun"); }
+  PYRUN_PENDING=pn;
+  const key=openApp("pyrun",{instance:true,title:pn.name+" — Python"});
+  PYRUN_PENDING=null;
+  return key;
 }
-function buildPyRun(body,win){
+function buildPyRun(body,win,rec){
   body.innerHTML=`<div class="pyide pyrunner">
     <div class="py-bar">
       <button class="py-btn go" data-a="again">⟳ Run again</button>
@@ -7596,7 +7620,7 @@ function buildPyRun(body,win){
     setStatus("running…","run");
     const t=win.querySelector(".tt"); if(t) t.textContent=cur.name+" — Python";
     live=pyLaunch(out, String(f.content==null?"":f.content), {
-      appId:"pyrun",
+      appId:(rec&&rec.key)||"pyrun",
       cwd:[...cur.path],
       scriptName:cur.name,
       setTitle:(x)=>{ const e=win.querySelector(".tt"); if(e) e.textContent=x+" — Python"; },
@@ -7604,7 +7628,6 @@ function buildPyRun(body,win){
     });
   }
   function load(pn){ cur={path:[...pn.path],name:pn.name}; start(); }
-  PYRUN.loader=load;
 
   body.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{
     const a=b.dataset.a;
@@ -10622,7 +10645,7 @@ function runningTasks(){
     {n:"explorer.exe", i:"📁", sys:true},
     {n:"Cork Defender",i:"🛡️", sys:true},
   ];
-  Object.keys(state.wins).forEach(id=>{ const a=APPS[id]; if(a) out.push({n:a.title,i:a.icon,win:id}); });
+  Object.keys(state.wins).forEach(id=>{ const a=winApp(id); if(a) out.push({n:winTitleOf(id),i:a.icon,win:id}); });
   if(hasKind("miner"))     out.push({n:"BitCorkMiner.exe",i:"⛏️",mal:1});
   if(hasKind("backdoor"))  out.push({n:"svch0st_rat.exe", i:"🚪",mal:1});
   if(hasKind("keylogger")) out.push({n:"klog32.exe",      i:"⌨️",mal:1});
