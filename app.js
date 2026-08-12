@@ -18,8 +18,15 @@
    Bump WC_VERSION every release and add a matching WC_CHANGELOG entry.
    After an update, the new version's changelog is shown once on the next
    sign-in ("What's new"), and `winver` in the Terminal reports the version. */
-const WC_VERSION = "2.1.0";
+const WC_VERSION = "2.2.0";
 const WC_CHANGELOG = {
+  "2.2.0": [
+    "⏰ Task Scheduler. Things can run without you being there — every time you sign in, when WinClone starts up, every few minutes, or at a set time each day. A task can open an app or run one of your Python scripts.",
+    "🐍 A script can schedule itself: winclone.schedule(\"thing.py\", \"logon\"). Which means something you run once can still be waiting for you after a restart, and getting rid of it means actually finding the task.",
+    "📜 Event Viewer. A record of what's happened to this PC — sign-ins and failed passwords, scripts starting and stopping, scheduled tasks firing, restore points, infections, factory resets. Filter it by Security, Errors, Warnings or Information.",
+    "📝 winclone.log(\"text\") writes your own lines into it, so a script can leave a trail. Add level=\"warning\" or \"error\" to colour it.",
+    "🔐 Creating or deleting a scheduled task is always written down as a Security event — nothing gets to quietly arrange its own return.",
+  ],
   "2.1.0": [
     "🐍 Python scripts run side by side. Opening a second .py used to take over the first one's window and kill whatever was running in it — now every script gets its own window and they all keep going at once.",
     "📊 Every script shows up under its own name. Task Manager, the taskbar, Task View and Alt+Tab all say wackhammer.py instead of a row of identical \"Python\" entries, so you can tell which is which — and end the right one.",
@@ -148,6 +155,8 @@ const APPS = {
   python:    {title:"Python",        icon:"🐍", w:840, h:620, build:buildPython},
   doom:      {title:"CloneDOOM",     icon:"👹", w:800, h:560, build:buildDoom},
   restore:   {title:"System Restore Points", icon:"🛟", w:680, h:520, build:buildRestore},
+  sched:     {title:"Task Scheduler", icon:"⏰", w:720, h:540, build:buildSched},
+  events:    {title:"Event Viewer",   icon:"📜", w:780, h:560, build:buildEvents},
   screenfx:  {title:"Screen FX",     icon:"🌀", w:620, h:600, build:buildScreenFX},
   archive:   {title:"Archive",       icon:"🗜️", w:560, h:420, build:buildArchive, hidden:true},
   pyrun:     {title:"Python",        icon:"🐍", w:660, h:520, build:buildPyRun, hidden:true},
@@ -177,13 +186,15 @@ const TILE_BG = {
   python:  "linear-gradient(135deg,#2b5b84,#ffd43b)",
   doom:    "linear-gradient(135deg,#5c1008,#c62d1f)",
   restore: "linear-gradient(135deg,#0f5c52,#2fb8a0)",
+  sched:   "linear-gradient(135deg,#7c2d12,#f59e0b)",
+  events:  "linear-gradient(135deg,#334155,#7c8ba1)",
   screenfx:"linear-gradient(135deg,#3b0764,#a855f7)",
   pyrun:   "linear-gradient(135deg,#2b5b84,#ffd43b)",
   archive: "linear-gradient(135deg,#6b7280,#d1d5db)",
   htmlview:"linear-gradient(135deg,#c2410c,#fb923c)",
   batch:   "linear-gradient(135deg,#18181b,#3f3f46)",
 };
-const PINNED = ["edgy","edge","mail","explorer","notepad","python","docs","calc","photos","settings","terminal","defender","restore","recycle"];
+const PINNED = ["edgy","edge","mail","explorer","notepad","python","docs","calc","photos","settings","terminal","defender","restore","sched","events","recycle"];
 const TASKBAR_PINS = ["explorer","edgy","edge","mail","notepad","terminal"];
 const DESKTOP_ICONS = [
   {app:"recycle",  label:"Recycle Bin"},
@@ -1599,6 +1610,8 @@ function rpRestore(id){
      copies from the keys we just wrote. */
   try{ loadState(); }catch(e){}
   try{ ICONPOS=JSON.parse(localStorage.getItem(IPOS_KEY))||{}; }catch(e){ ICONPOS={}; }
+  try{ logEvent("warning","System Restore","Restored to “"+pt.name+"”",
+    "Taken "+new Date(pt.when).toLocaleString()+" on WinClone "+(pt.version||"?")); }catch(e){}
   try{ NOTIFS=JSON.parse(localStorage.getItem("wc_notifs"))||[]; }catch(e){ NOTIFS=[]; }
   try{ INFECTIONS=(INFECTIONS||[]).map(x=>typeof x==="string"?{name:x,kind:"scareware"}:x)
         .filter(x=>x&&x.kind); }catch(e){}
@@ -1660,6 +1673,7 @@ function buildRestore(body,win){
           const err=rpCreate(nm);
           if(err){ winDialog({icon:"⚠️",title:"Couldn't create restore point",msg:esc(err)}); return; }
           draw();
+          logEvent("info","System Restore","Restore point created — “"+nm+"”");
           notify({icon:"🛟",title:"Restore point created",body:nm});
         }
       });
@@ -5971,6 +5985,60 @@ function makeWincloneModule(io,fn){
   /* winclone.tasks() — what Task Manager is showing, as a list of names. */
   d.tasks=fn("tasks",()=>runningTasks().map(t=>t.n));
 
+  /* winclone.log("text") — write a line into Event Viewer. level can be
+     "info", "warning", "error" or "security". */
+  d.log=fn("log",(a,kw)=>{
+    const msg=a.length?pyStr(a[0]):"";
+    let lv=(kw&&kw.level)?pyStr(kw.level):(a.length>1?pyStr(a[1]):"info");
+    if(["info","warning","error","security"].indexOf(lv)<0) lv="info";
+    logEvent(lv,"Python",msg,kw&&kw.detail?pyStr(kw.detail):"");
+    return null;
+  });
+
+  /* winclone.schedule("thing.py", "logon") — make it run on its own.
+     when: "logon", "boot", "every:10" (minutes), or "daily:09:30".
+     Pass an app id instead of a filename to have it open an app.
+     This is how a script survives a restart: it can schedule itself. */
+  d.schedule=fn("schedule",(a,kw)=>{
+    if(!a.length) throw pyErr("ValueError","what should it run? winclone.schedule(\"thing.py\",\"logon\")");
+    const target=pyStr(a[0]);
+    const when=(a.length>1?pyStr(a[1]):(kw&&kw.when?pyStr(kw.when):"logon")).trim();
+    let action;
+    if(APPS[target.toLowerCase()]&&!/\.py$/i.test(target)) action={app:target.toLowerCase()};
+    else{
+      const segs=resolve(target);
+      const name=segs[segs.length-1];
+      const parent=nodeAt(segs.slice(0,-1));
+      if(!parent||!parent.children||!parent.children[name])
+        throw pyErr("FileNotFoundError","no file called '"+target+"' — and it isn't an app id either");
+      action={path:segs.slice(0,-1),file:name};
+    }
+    let trigger;
+    if(when==="logon"||when==="boot") trigger={kind:when};
+    else if(when.indexOf("every:")===0){
+      const m=parseInt(when.slice(6),10);
+      if(!(m>=1)) throw pyErr("ValueError","every: needs a number of minutes, like \"every:10\"");
+      trigger={kind:"interval",every:Math.min(1440,m)};
+    }
+    else if(when.indexOf("daily:")===0){
+      const at=when.slice(6);
+      if(!/^\d{1,2}:\d{2}$/.test(at)) throw pyErr("ValueError","daily: needs a time, like \"daily:09:30\"");
+      trigger={kind:"daily",at};
+    }
+    else throw pyErr("ValueError","when must be \"logon\", \"boot\", \"every:N\" or \"daily:HH:MM\"");
+    const nm=(kw&&kw.name)?pyStr(kw.name):(action.app||action.file);
+    return schedAdd({name:nm,action,trigger}).name;
+  });
+
+  d.scheduled=fn("scheduled",()=>SCHED.map(t=>t.name));
+  d.unschedule=fn("unschedule",(a)=>{
+    const raw=a.length?pyStr(a[0]):"";
+    const t=schedFind(raw);
+    if(!t) throw pyErr("ValueError","no task called '"+raw+"' — winclone.scheduled() lists them");
+    schedRemove(t.id);
+    return true;
+  });
+
   /* winclone.terminate_task("Notepad") — ends it, with the same rules the
      End task button follows: apps close, malware refuses (a rootkit respawns
      it, that's Cork Defender's job), system processes are off limits. */
@@ -7618,13 +7686,16 @@ function buildPyRun(body,win,rec){
     }
     stop();
     setStatus("running…","run");
+    logEvent("info","Python","Script started — "+cur.name);
     const t=win.querySelector(".tt"); if(t) t.textContent=cur.name+" — Python";
     live=pyLaunch(out, String(f.content==null?"":f.content), {
       appId:(rec&&rec.key)||"pyrun",
       cwd:[...cur.path],
       scriptName:cur.name,
       setTitle:(x)=>{ const e=win.querySelector(".tt"); if(e) e.textContent=x+" — Python"; },
-      onDone:(ok)=>{ live=null; setStatus(ok?"finished":"stopped — see the error above",ok?"ok":"bad"); },
+      onDone:(ok)=>{ live=null; setStatus(ok?"finished":"stopped — see the error above",ok?"ok":"bad");
+        logEvent(ok?"info":"warning","Python",
+          (ok?"Script finished — ":"Script stopped — ")+cur.name); },
     });
   }
   function load(pn){ cur={path:[...pn.path],name:pn.name}; start(); }
@@ -7749,6 +7820,14 @@ function pyHelpDialog(){
     back a list of full paths. Part of a name works too, and so do wildcards:
     <code>search_file("*.py")</code><br>
     <code>winclone.tasks()</code> — everything Task Manager is showing, as a list of names<br>
+    <code>winclone.schedule("thing.py", "logon")</code> — make it run on its own from now on.
+    When can be <code>"logon"</code>, <code>"boot"</code>, <code>"every:10"</code> (minutes) or
+    <code>"daily:09:30"</code>. Pass an app id instead of a filename to open an app instead.
+    <b>A script can schedule itself</b> — which is how something is still there after a restart<br>
+    <code>winclone.scheduled()</code> — the names of every scheduled task ·
+    <code>winclone.unschedule(name)</code> — remove one<br>
+    <code>winclone.log("text")</code> — write a line into Event Viewer. Add
+    <code>level="warning"</code> (or <code>"error"</code>, <code>"security"</code>) to colour it<br>
     <code>winclone.terminate_task("Notepad")</code> — ends that task. Same rules as the
     End task button: apps close, system processes are refused, and malware throws
     <code>PermissionError</code> because a rootkit just respawns it — that one's
@@ -8586,7 +8665,10 @@ function stopAllEffectsUI(){
 }
 function infect(name,kind){
   kind=kind||"scareware";
-  if(!INFECTIONS.some(i=>i.name===name&&i.kind===kind)) INFECTIONS.push({name,kind});
+  if(!INFECTIONS.some(i=>i.name===name&&i.kind===kind)){
+    INFECTIONS.push({name,kind});
+    try{ logEvent("error","Cork Defender","Infected — "+name,"Kind: "+kind); }catch(e){}
+  }
   saveInfections();
   if(kind==="ransomware") encryptFiles();
   if(kind==="trojan"){
@@ -11281,6 +11363,7 @@ function doRestart(){
    saying which PC we were in, so the reset dropped you on the picker, and
    clicking the PC downloaded everything you'd just erased. */
 async function factoryResetPC(){
+  try{ logEvent("warning","System","Factory reset — everything on this PC erased"); }catch(e){}
   Object.keys(localStorage)
     .filter(k=>k.startsWith("wc_") && k!=="wc_acct_pc" && k!=="wc_acct_seen")
     .forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
@@ -11841,6 +11924,279 @@ async function acBoot(){
   }
 }
 
+/* ============================ EVENT LOG ============================
+   A running record of things that actually happened to this PC — sign-ins,
+   scripts, scheduled tasks, restores, infections. It lives in the snapshot
+   like everything else, so the log travels with the PC.
+
+   Kept deliberately small: 300 entries is plenty of history and costs about
+   40 KB of the ~5 MB a PC gets. */
+const EVT_KEY="wc_events", EVT_MAX=300;
+let EVENTS=[]; try{ EVENTS=JSON.parse(localStorage.getItem(EVT_KEY))||[]; }catch(e){ EVENTS=[]; }
+let EVT_REDRAW=null;
+function saveEvents(){ try{ localStorage.setItem(EVT_KEY, JSON.stringify(EVENTS)); }catch(e){} }
+/* level: "info" | "warning" | "error" | "security" */
+function logEvent(level,source,msg,detail){
+  EVENTS.unshift({t:Date.now(),lv:level||"info",src:String(source||"System"),
+                  msg:String(msg||"").slice(0,180),d:detail?String(detail).slice(0,400):""});
+  if(EVENTS.length>EVT_MAX) EVENTS.length=EVT_MAX;
+  saveEvents();
+  if(EVT_REDRAW) try{ EVT_REDRAW(); }catch(e){}
+}
+const EVT_ICON={info:"ℹ️",warning:"⚠️",error:"❌",security:"🔐"};
+
+function buildEvents(body){
+  let filter="all", openId=null;
+  const draw=()=>{
+    if(!body.isConnected){ EVT_REDRAW=null; return; }
+    const rows=EVENTS.filter(e=>filter==="all"||e.lv===filter);
+    body.innerHTML=`<div class="ev">
+      <div class="ev-bar">
+        <div class="ev-tabs"></div>
+        <span class="ev-count">${rows.length} of ${EVENTS.length}</span>
+        <button class="ev-clear">Clear log</button>
+      </div>
+      <div class="ev-list"></div>
+    </div>`;
+    const tabs=body.querySelector(".ev-tabs");
+    [["all","Everything"],["security","🔐 Security"],["error","❌ Errors"],
+     ["warning","⚠️ Warnings"],["info","ℹ️ Information"]].forEach(([k,label])=>{
+      const b=el("button","ev-tab"+(filter===k?" on":""),label);
+      b.onclick=()=>{ filter=k; draw(); };
+      tabs.appendChild(b);
+    });
+    body.querySelector(".ev-clear").onclick=()=>{
+      winDialog({icon:"🗑️",title:"Clear the log",
+        msg:"Delete every event? This can't be undone.",
+        buttons:[{label:"Clear",primary:true,action:()=>{ EVENTS=[]; saveEvents(); draw(); }},{label:"Cancel"}]});
+    };
+    const list=body.querySelector(".ev-list");
+    if(!rows.length){
+      list.innerHTML=`<div class="ev-empty">Nothing logged yet.</div>`;
+      return;
+    }
+    rows.forEach((e,i)=>{
+      const when=new Date(e.t);
+      const row=el("div","ev-row lv-"+e.lv+(openId===e.t+"|"+i?" open":""),
+        `<span class="ev-ic">${EVT_ICON[e.lv]||"ℹ️"}</span>
+         <div class="ev-meta">
+           <b>${esc(e.msg)}</b>
+           <small>${esc(e.src)} · ${when.toLocaleDateString()} ${when.toLocaleTimeString()}</small>
+           ${e.d?`<div class="ev-detail">${esc(e.d)}</div>`:""}
+         </div>`);
+      row.onclick=()=>{ openId=(openId===e.t+"|"+i)?null:e.t+"|"+i; draw(); };
+      list.appendChild(row);
+    });
+  };
+  EVT_REDRAW=draw;
+  draw();
+}
+
+/* ============================ TASK SCHEDULER ============================
+   Scripts that run without you opening them: at sign-in, at start-up, on a
+   timer, or at a time of day. This is what lets something persist — a script
+   can schedule itself and be back after a restart, which is the whole point.
+   Everything it does is written to the Event Log. */
+const SCHED_KEY="wc_sched";
+let SCHED=[]; try{ SCHED=JSON.parse(localStorage.getItem(SCHED_KEY))||[]; }catch(e){ SCHED=[]; }
+let SCHED_REDRAW=null, SCHED_BOOTED=false, SIGNED_IN=false;
+function saveSched(){ try{ localStorage.setItem(SCHED_KEY, JSON.stringify(SCHED)); }catch(e){} }
+function schedFind(name){
+  const n=String(name||"").toLowerCase();
+  return SCHED.find(t=>t.name.toLowerCase()===n)||SCHED.find(t=>t.name.toLowerCase().indexOf(n)>=0);
+}
+function schedLabel(t){
+  const tr=t.trigger||{};
+  if(tr.kind==="logon")    return "At sign-in";
+  if(tr.kind==="boot")     return "At start-up";
+  if(tr.kind==="interval") return "Every "+(tr.every||10)+" min";
+  if(tr.kind==="daily")    return "Daily at "+(tr.at||"09:00");
+  return "Never";
+}
+function schedAdd(o){
+  const t={
+    id:"tk"+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36),
+    name:String(o.name||"Task").slice(0,40),
+    action:o.action, trigger:o.trigger,
+    enabled:o.enabled!==false, lastRun:0, made:Date.now(),
+  };
+  SCHED.push(t); saveSched();
+  /* Worth a security line: this is the mechanism something would use to come
+     back after a reboot, so it should never happen invisibly. */
+  logEvent("security","Task Scheduler","Task created — “"+t.name+"”",
+    schedLabel(t)+" · runs "+(t.action.app?t.action.app:t.action.file));
+  if(SCHED_REDRAW) try{ SCHED_REDRAW(); }catch(e){}
+  return t;
+}
+function schedRemove(id){
+  const t=SCHED.find(x=>x.id===id);
+  SCHED=SCHED.filter(x=>x.id!==id); saveSched();
+  if(t) logEvent("security","Task Scheduler","Task deleted — “"+t.name+"”");
+  if(SCHED_REDRAW) try{ SCHED_REDRAW(); }catch(e){}
+}
+function schedRun(t,why){
+  t.lastRun=Date.now(); saveSched();
+  try{
+    if(t.action.app){
+      if(!APPS[t.action.app]) throw new Error("no app called "+t.action.app);
+      openApp(t.action.app);
+      logEvent("info","Task Scheduler","Ran “"+t.name+"”",why+" · opened "+t.action.app);
+    } else {
+      const parent=nodeAt(t.action.path||[]);
+      const f=parent&&parent.children&&parent.children[t.action.file];
+      if(!f){
+        logEvent("error","Task Scheduler","“"+t.name+"” failed",
+          t.action.file+" is missing — the task stayed put but had nothing to run");
+        return false;
+      }
+      openPyFile({path:t.action.path,name:t.action.file});
+      logEvent("info","Task Scheduler","Ran “"+t.name+"”",why+" · started "+t.action.file);
+    }
+    if(SCHED_REDRAW) try{ SCHED_REDRAW(); }catch(e){}
+    return true;
+  }catch(e){
+    logEvent("error","Task Scheduler","“"+t.name+"” could not start",String((e&&e.message)||e));
+    return false;
+  }
+}
+function schedFire(kind,why){
+  SCHED.filter(t=>t.enabled&&t.trigger&&t.trigger.kind===kind).forEach(t=>schedRun(t,why));
+}
+function schedTick(){
+  if(!SIGNED_IN) return;
+  const ms=Date.now(), now=new Date();
+  SCHED.forEach(t=>{
+    if(!t.enabled||!t.trigger) return;
+    const tr=t.trigger;
+    if(tr.kind==="interval"){
+      const every=Math.max(1,parseInt(tr.every,10)||10)*60000;
+      if(ms-(t.lastRun||0)>=every) schedRun(t,"Every "+tr.every+" min");
+    } else if(tr.kind==="daily"){
+      const p=String(tr.at||"09:00").split(":");
+      const due=new Date(now); due.setHours(parseInt(p[0],10)||0,parseInt(p[1],10)||0,0,0);
+      if(now>=due && (t.lastRun||0)<due.getTime()) schedRun(t,"Daily at "+tr.at);
+    }
+  });
+}
+setInterval(schedTick,15000);
+
+function buildSched(body){
+  const draw=()=>{
+    if(!body.isConnected){ SCHED_REDRAW=null; return; }
+    body.innerHTML=`<div class="tk">
+      <div class="tk-head">
+        <div>
+          <div class="tk-title">Task Scheduler</div>
+          <div class="tk-sub">Things that run on their own — at sign-in, at start-up, or on a clock.</div>
+        </div>
+        <button class="tk-new">＋ New task</button>
+      </div>
+      <div class="tk-list"></div>
+      <div class="tk-foot">${SCHED.length} task${SCHED.length===1?"":"s"} · everything they do is written to Event Viewer</div>
+    </div>`;
+    const list=body.querySelector(".tk-list");
+    if(!SCHED.length){
+      list.innerHTML=`<div class="tk-empty"><div class="tk-eic">⏰</div>
+        <b>Nothing scheduled</b>
+        <span>A task can open an app or run one of your Python scripts without you
+        being there. Scripts can create tasks too — <code>winclone.schedule()</code>.</span></div>`;
+    } else {
+      SCHED.forEach(t=>{
+        const row=el("div","tk-row"+(t.enabled?"":" off"),
+          `<div class="tk-ic">${t.action.app?(APPS[t.action.app]?APPS[t.action.app].icon:"🪟"):"🐍"}</div>
+           <div class="tk-meta">
+             <b>${esc(t.name)}</b>
+             <span>${esc(schedLabel(t))} · ${esc(t.action.app||t.action.file)}${
+               t.lastRun?" · last ran "+new Date(t.lastRun).toLocaleTimeString():" · never run"}</span>
+           </div>`);
+        const runNow=el("button","tk-btn","Run now");
+        const toggle=el("button","tk-btn",t.enabled?"Disable":"Enable");
+        const del=el("button","tk-btn","Delete");
+        runNow.onclick=()=>{ schedRun(t,"Run now"); draw(); };
+        toggle.onclick=()=>{ t.enabled=!t.enabled; saveSched();
+          logEvent("info","Task Scheduler",(t.enabled?"Enabled":"Disabled")+" “"+t.name+"”"); draw(); };
+        del.onclick=()=>winDialog({icon:"🗑️",title:"Delete task",
+          msg:"Delete <b>"+esc(t.name)+"</b>? Whatever it runs stays where it is.",
+          buttons:[{label:"Delete",primary:true,action:()=>{ schedRemove(t.id); draw(); }},{label:"Cancel"}]});
+        row.appendChild(runNow); row.appendChild(toggle); row.appendChild(del);
+        list.appendChild(row);
+      });
+    }
+    body.querySelector(".tk-new").onclick=()=>newTaskDialog(draw);
+  };
+  SCHED_REDRAW=draw;
+  draw();
+}
+
+function newTaskDialog(after){
+  /* every .py on the machine, so you can pick one */
+  const scripts=[];
+  (function walk(node,path){
+    Object.keys(node.children||{}).forEach(k=>{
+      const it=node.children[k];
+      if(it.folder) walk(it,path.concat(k));
+      else if(/\.py$/i.test(k)) scripts.push({name:k,path:path,label:path.concat(k).join("\\")});
+    });
+  })({children:VFS},[]);
+
+  const d=winDialog({icon:"⏰",title:"New task",msg:`
+    <div class="tk-new-form">
+      <label>Name</label>
+      <input class="tkf-name" maxlength="40" value="New task">
+      <label>What should it run?</label>
+      <select class="tkf-what"></select>
+      <label>When?</label>
+      <select class="tkf-when">
+        <option value="logon">Every time I sign in</option>
+        <option value="boot">When WinClone starts up</option>
+        <option value="interval">Every few minutes</option>
+        <option value="daily">Once a day at a set time</option>
+      </select>
+      <div class="tkf-extra"></div>
+      <div class="tkf-err"></div>
+    </div>`,
+    buttons:[{label:"Create",primary:true,action:null},{label:"Cancel"}]});
+
+  const what=d.querySelector(".tkf-what");
+  scripts.forEach((s,i)=>{ const o=document.createElement("option");
+    o.value="py:"+i; o.textContent="🐍 "+s.label; what.appendChild(o); });
+  Object.keys(APPS).filter(k=>!APPS[k].hidden).forEach(k=>{
+    const o=document.createElement("option");
+    o.value="app:"+k; o.textContent=APPS[k].icon+" "+APPS[k].title; what.appendChild(o);
+  });
+
+  const when=d.querySelector(".tkf-when"), extra=d.querySelector(".tkf-extra");
+  const drawExtra=()=>{
+    extra.innerHTML = when.value==="interval"
+      ? `<label>Every how many minutes?</label><input class="tkf-every" type="number" min="1" max="1440" value="10">`
+      : when.value==="daily"
+      ? `<label>At what time?</label><input class="tkf-at" type="time" value="09:00">`
+      : "";
+  };
+  when.onchange=drawExtra; drawExtra();
+
+  /* winDialog's buttons close the dialog on click, so wire Create by hand to
+     keep the form open when something's wrong. */
+  const createBtn=[...d.querySelectorAll(".dlg-btn")].find(b=>b.textContent==="Create");
+  createBtn.onclick=(ev)=>{
+    ev.stopPropagation();
+    const err=d.querySelector(".tkf-err");
+    const name=d.querySelector(".tkf-name").value.trim();
+    if(!name){ err.textContent="Give it a name."; return; }
+    const v=what.value;
+    if(!v){ err.textContent="There's nothing to run — make a .py file first, or pick an app."; return; }
+    const action = v.indexOf("py:")===0
+      ? (()=>{ const s=scripts[+v.slice(3)]; return {path:s.path,file:s.name}; })()
+      : {app:v.slice(4)};
+    const trigger={kind:when.value};
+    if(when.value==="interval") trigger.every=Math.max(1,parseInt(d.querySelector(".tkf-every").value,10)||10);
+    if(when.value==="daily")    trigger.at=d.querySelector(".tkf-at").value||"09:00";
+    schedAdd({name,action,trigger});
+    d.remove();
+    if(after) after();
+  };
+}
+
 /* ============================ WINCLONE MAIL ============================
    Mail belongs to the ACCOUNT, not to a PC. It lives in Supabase and is read
    live, so it is deliberately absent from the wc_ snapshot: the same inbox
@@ -12393,12 +12749,19 @@ function lgReset(){
 function trySignIn(){
   const v=$("#lg-pass").value;
   if(!v){ lgError("Enter your password."); return; }
-  if(!checkPassword(v)){ lgError("That password is incorrect. Try again."); $("#lg-pass").select(); return; }
+  if(!checkPassword(v)){ logEvent("security","Security","Failed sign-in — wrong password");
+    lgError("That password is incorrect. Try again."); $("#lg-pass").select(); return; }
   lgError(""); doSignIn();
 }
 function signIn(){ doSignIn(); }
 function doSignIn(){
   sfx("startup");
+  SIGNED_IN=true;
+  logEvent("security","Security","Signed in as "+getUser());
+  /* "At start-up" fires once per actual WinClone boot; "at sign-in" fires
+     every unlock, including after a lock, a BSOD or a restore. */
+  if(!SCHED_BOOTED){ SCHED_BOOTED=true; setTimeout(()=>schedFire("boot","At start-up"),1200); }
+  setTimeout(()=>schedFire("logon","At sign-in"),1800);
   $("#login").classList.add("hide");
   setTimeout(()=>$("#lg-pass").blur(),100);
   applySystemHealth();
