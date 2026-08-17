@@ -1,0 +1,341 @@
+<!doctype html>
+<!--
+  WinClone — a FAN-MADE CONCEPT: a desktop-OS tribute that lives in a browser tab.
+  Copyright (c) 2026 thisisuhhplanetring. All rights reserved.
+
+  FAN PROJECT / CONCEPT PIECE. This is not a real operating system, and it is
+  not Microsoft Windows. It contains no Microsoft code, artwork or assets —
+  everything here was written and drawn from scratch. It is not affiliated with,
+  endorsed by, sponsored by or connected to Microsoft Corporation, and it is
+  free and never sold. "Windows" and "Microsoft" are trademarks of their
+  respective owners, referenced descriptively only.
+
+  Original work of thisisuhhplanetring. Read it, learn from it, modify your own private copy,
+  fork it on GitHub. Do NOT rehost or republish it as a site of your own, or
+  strip these notices. Full terms: see LICENSE.txt.
+-->
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WinClone</title>
+<!-- Supabase client — powers WinClone Accounts. If this fails to load (offline,
+     or opened from file://), app.js notices and falls back to a single local PC. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+/* ===== WinClone bootstrap / installer =====
+   On http(s) (e.g. GitHub Pages) WinClone runs an *installed* copy of its own code
+   (app.js + styles.css) kept in localStorage. A fresh deploy is downloaded but NOT
+   applied until the user picks "Update and restart" from Start ▸ Power — so if you
+   don't update, you keep running the old version. On file:// there's no repo to
+   update against, so the on-disk files load directly.
+
+   HTML_BUILD guards against a mismatch: index.html always comes fresh from the
+   server, but the installed code may be older. If that old code doesn't understand
+   this page's markup you get a broken hybrid UI (panels that never hide, unstyled
+   menus). So bump HTML_BUILD whenever the markup below changes structurally — an
+   installed copy stamped with a different build is discarded and re-downloaded
+   automatically instead of being booted. */
+var HTML_BUILD = "1.6.0-win10";
+(function(){
+  var http = /^https?:$/.test(location.protocol);
+  var stale = localStorage.getItem("wc_sys_html") !== HTML_BUILD;
+  if(http && stale){            // installed code predates this markup — force a clean re-install
+    try{ localStorage.removeItem("wc_sys_js"); localStorage.removeItem("wc_sys_css"); }catch(e){}
+  }
+  var CSS = http ? localStorage.getItem("wc_sys_css") : null;
+  var JS  = http ? localStorage.getItem("wc_sys_js")  : null;
+  // styles first (synchronous), to avoid a flash of unstyled content
+  if(CSS){ var st=document.createElement("style"); st.id="wc-sys-css"; st.textContent=CSS; document.head.appendChild(st); }
+  else   { var lk=document.createElement("link"); lk.rel="stylesheet"; lk.href="styles.css"; document.head.appendChild(lk); }
+  function inject(code){ var s=document.createElement("script"); s.textContent=code; document.body.appendChild(s); }
+  function injectSrc(){ var s=document.createElement("script"); s.src="app.js"; document.body.appendChild(s); }
+  function bust(f){ return fetch(f+"?v="+Date.now(),{cache:"no-store"}).then(function(r){ if(!r.ok) throw 0; return r.text(); }); }
+  function start(){
+    if(JS){ inject(JS); return; }                 // boot the installed (possibly older) version
+    if(!http){ injectSrc(); return; }              // file:// — load the on-disk files
+    // first run on a server: download the current version, install it, then boot it
+    Promise.all([bust("app.js"), bust("styles.css")]).then(function(r){
+      try{ localStorage.setItem("wc_sys_js", r[0]); localStorage.setItem("wc_sys_css", r[1]);
+           localStorage.setItem("wc_sys_html", HTML_BUILD); }catch(e){}   // stamp what markup this code was installed for
+      inject(r[0]);
+    }).catch(injectSrc);                           // offline on first run: fall back to on-disk
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+})();
+</script>
+</head>
+<body>
+
+<!-- DESKTOP -->
+<div id="desktop" class="dark">
+  <div class="hero-logo"><i></i><i></i></div>
+  <div id="icons"></div>
+</div>
+
+<!-- TASKBAR (Windows 10: everything left-aligned, search box next to Start) -->
+<div id="taskbar">
+  <div id="tb-left">
+    <button class="tbtn" id="startbtn" title="Start"><svg class="winlogo" viewBox="0 0 16 16" aria-hidden="true">
+      <path fill="currentColor" d="M0 1 L7 1 L9 4.5 L7 8 L9 11.5 L7 15 L0 15 Z"/>
+      <path fill="currentColor" d="M9 1 L16 1 L16 15 L9 15 L11 11.5 L9 8 L11 4.5 Z"/>
+    </svg></button>
+    <button id="searchbtn" title="Search"><span class="s-ic">🔍</span><span class="s-txt">Type here to search</span></button>
+    <button class="tbtn" id="taskviewbtn" title="Task View"><svg class="tvsvg" viewBox="0 0 22 16" aria-hidden="true">
+      <rect x="1.4" y="2.6" width="11" height="10.8" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <rect x="14.2" y="2.6" width="6.4" height="4.6" rx="1" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".75"/>
+      <rect x="14.2" y="8.8" width="6.4" height="4.6" rx="1" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".75"/>
+    </svg></button>
+    <div id="tb-apps" style="display:flex"></div>
+  </div>
+  <div id="tb-right">
+    <button class="trayitem" id="widgetsbtn" title="News and interests"><span class="tray-ic">🌤️</span></button>
+    <button class="trayitem" id="chevron" title="Hidden icons"><span class="tray-ic">⌃</span></button>
+    <button class="trayitem" id="notifbtn" title="Notifications"><svg class="tsvg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.2"><path d="M8 2a4 4 0 0 0-4 4v3L2.5 11.5h11L12 9V6a4 4 0 0 0-4-4z"/><path d="M6.5 13a1.5 1.5 0 0 0 3 0"/></svg><span id="notif-badge"></span></button>
+    <button class="trayitem" id="quickbtn" title="Network / Sound / Battery">
+      <svg class="tsvg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.3"><path d="M1.5 6.2a9.3 9.3 0 0 1 13 0"/><path d="M3.8 8.7a6 6 0 0 1 8.4 0"/><path d="M6.1 11.1a2.8 2.8 0 0 1 3.8 0"/><circle cx="8" cy="13.2" r="1" fill="#fff" stroke="none"/></svg>
+      <svg class="tsvg" viewBox="0 0 16 16"><path d="M2 6v4h2.5L8 13V3L4.5 6H2z" fill="#fff"/><path d="M10 5.5a3.5 3.5 0 0 1 0 5" stroke="#fff" stroke-width="1.2" fill="none"/><path d="M11.8 3.8a6 6 0 0 1 0 8.4" stroke="#fff" stroke-width="1.2" fill="none"/></svg>
+      <svg class="tsvg wide" viewBox="0 0 18 10"><rect x=".6" y=".6" width="14" height="8.8" rx="1" fill="none" stroke="#fff" stroke-width="1.1"/><rect x="15.6" y="3" width="1.9" height="4" fill="#fff"/><rect x="2.2" y="2.2" width="10.8" height="5.6" fill="#fff"/></svg>
+    </button>
+    <button class="trayitem" id="tray-clock">
+      <span id="clk-time">12:00 PM</span>
+      <small id="clk-date">1/1/2026</small>
+    </button>
+    <button id="showdesk" title="Show desktop"></button>
+  </div>
+</div>
+
+<!-- START MENU (Windows 10: icon rail / app list / live tiles) -->
+<div id="startmenu" class="flyout">
+  <div class="sm-rail">
+    <button class="rail-btn" id="rail-user" title="User"><div class="avatar">U</div></button>
+    <div class="rail-gap"></div>
+    <button class="rail-btn" id="rail-settings" title="Settings">⚙️</button>
+    <button class="rail-btn" id="powerbtn" title="Power">⏻</button>
+  </div>
+  <div class="sm-listwrap">
+    <input id="start-search" placeholder="Search apps and files" autocomplete="off">
+    <div id="sm-list"></div>
+  </div>
+  <div class="sm-tilewrap">
+    <div class="sm-tilehead">Play and explore</div>
+    <div id="sm-grid"></div>
+  </div>
+</div>
+
+<!-- NETWORK / VOLUME FLYOUT (quick actions live in the action center, like Win10) -->
+<div id="quick" class="flyout">
+  <div class="qs-slider"><span>🔆</span><input type="range" min="0" max="100" value="80" id="bright"></div>
+  <div class="qs-slider"><span id="vol-ic">🔊</span><input type="range" min="0" max="100" value="65" id="vol"></div>
+  <div id="wifilist"></div>
+</div>
+
+<!-- CALENDAR -->
+<div id="cal" class="flyout">
+  <div class="cbig" id="cal-time">12:00:00 PM</div>
+  <div class="cdate" id="cal-date">Wednesday, July 8, 2026</div>
+  <div class="cal-grid" id="cal-grid"></div>
+</div>
+
+<!-- NOTIFICATION CENTER -->
+<div id="notif" class="flyout">
+  <div class="notif-head"><b>Notifications</b><button class="allbtn" id="notif-clear">Clear all</button></div>
+  <div id="notif-list"></div>
+  <div class="qs-grid">
+    <div class="qs-tile on" data-q="wifi"><span class="gl">📶</span> Wi-Fi</div>
+    <div class="qs-tile" data-q="bt"><span class="gl">🔵</span> Bluetooth</div>
+    <div class="qs-tile" data-q="air"><span class="gl">✈️</span> Airplane</div>
+    <div class="qs-tile" data-q="save"><span class="gl">🔋</span> Battery saver</div>
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div id="toasts"></div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx"></div>
+
+<!-- TASK VIEW (window overview + virtual desktops) -->
+<div id="taskview">
+  <div class="tv-scroll"><div class="tv-grid"></div></div>
+  <div class="tv-desks"></div>
+</div>
+
+<!-- ALT+TAB WINDOW SWITCHER -->
+<div id="altswitch"></div>
+
+<!-- BOOT SPLASH -->
+<div id="boot">
+  <svg class="bt-logo" viewBox="0 0 16 16" aria-hidden="true">
+    <path fill="#0078d7" d="M0 1 L7 1 L9 4.5 L7 8 L9 11.5 L7 15 L0 15 Z"/>
+    <path fill="#0078d7" d="M9 1 L16 1 L16 15 L9 15 L11 11.5 L9 8 L11 4.5 Z"/>
+  </svg>
+  <div class="bt-ring"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+</div>
+
+<!-- WINCLONE ACCOUNT (sign in / register) — shown before the PC picker -->
+<div id="account">
+  <div class="ac-card">
+    <svg class="ac-logo" viewBox="0 0 16 16" aria-hidden="true">
+      <path fill="#4aa3ff" d="M0 1 L7 1 L9 4.5 L7 8 L9 11.5 L7 15 L0 15 Z"/>
+      <path fill="#4aa3ff" d="M9 1 L16 1 L16 15 L9 15 L11 11.5 L9 8 L11 4.5 Z"/>
+    </svg>
+    <div class="ac-title" id="ac-title">Sign in to WinClone</div>
+    <div class="ac-sub" id="ac-sub">Your PCs follow you to any computer you sign in from.</div>
+
+    <button class="ac-google" id="ac-google">
+      <svg viewBox="0 0 18 18" aria-hidden="true">
+        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/>
+        <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+      </svg>
+      <span>Continue with Google</span>
+    </button>
+
+    <div class="ac-or"><i></i><span>or</span><i></i></div>
+
+    <input id="ac-email" type="email" placeholder="Email" autocomplete="username" spellcheck="false">
+    <input id="ac-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="ac-err" id="ac-err"></div>
+    <button class="ac-go" id="ac-go">Sign in</button>
+    <button class="lg-link" id="ac-swap">Don't have an account? Create one</button>
+    <div class="ac-offline" id="ac-offline"></div>
+  </div>
+  <div class="lg-credit">WinClone — a fanmade concept by thisisuhhplanetring · © 2026 · Not affiliated with Microsoft</div>
+</div>
+
+<!-- PC PICKER — the saved desktops on this account (max 3) -->
+<div id="pcs">
+  <div class="pc-wrap">
+    <div class="pc-head">
+      <div class="pc-title">Choose a PC</div>
+      <div class="pc-sub">Each one keeps its own files, wallpaper and password.</div>
+    </div>
+    <div class="pc-grid" id="pc-grid"></div>
+    <div class="pc-foot">
+      <span id="pc-who"></span>
+      <button class="lg-link" id="pc-signout">Sign out</button>
+    </div>
+  </div>
+  <div class="lg-credit">WinClone — a fanmade concept by thisisuhhplanetring · © 2026 · Not affiliated with Microsoft</div>
+</div>
+
+<!-- LOGIN — starts hidden: the account screen and PC picker come first, and
+     whoever decides a PC is in play (acBoot, or the offline fallback) reveals it. -->
+<div id="login" class="hide">
+  <div class="clock-big" id="lg-time">12:00</div>
+  <div class="date-big" id="lg-date">Wednesday, July 8</div>
+  <div class="lg-user">
+    <div class="avatar-lg">U</div>
+    <div class="lg-name">User</div>
+
+    <!-- normal sign-in -->
+    <div class="lg-panel" id="lg-signin">
+      <div class="lg-row">
+        <input id="lg-pass" type="password" placeholder="Password" autocomplete="off">
+        <button class="go" id="lg-go">→</button>
+      </div>
+      <div class="lg-err"></div>
+      <button class="lg-link" id="lg-forgot">Forgot password?</button>
+    </div>
+
+    <!-- first-run setup (forced when no password exists yet) -->
+    <div class="lg-panel" id="lg-setup">
+      <div class="lg-title" id="lg-setup-title">Create a password</div>
+      <div class="lg-sub" id="lg-setup-sub">Set up this PC before you sign in for the first time.</div>
+      <div class="lg-step" data-step="1">
+        <input id="lg-new1" type="password" placeholder="New password" autocomplete="off">
+        <input id="lg-new2" type="password" placeholder="Confirm password" autocomplete="off">
+        <button class="lg-btn" id="lg-next1">Next</button>
+      </div>
+      <div class="lg-step" data-step="2">
+        <div class="lg-qpick">
+          <button class="lg-qbtn" data-q="pet">🐾 Your pet's name</button>
+          <button class="lg-qbtn" data-q="num">🔢 A number between 1 and 999</button>
+        </div>
+        <input id="lg-ans" placeholder="Your answer" autocomplete="off">
+        <button class="lg-btn" id="lg-finish">Finish setup</button>
+      </div>
+      <div class="lg-err"></div>
+    </div>
+
+    <!-- forgot-password recovery -->
+    <div class="lg-panel" id="lg-recover">
+      <div class="lg-title">Reset your password</div>
+      <div class="lg-sub" id="lg-rq">Security question</div>
+      <div class="lg-step" data-step="1">
+        <input id="lg-rans" placeholder="Your answer" autocomplete="off">
+        <button class="lg-btn" id="lg-rcheck">Continue</button>
+      </div>
+      <div class="lg-step" data-step="2">
+        <input id="lg-rnew1" type="password" placeholder="New password" autocomplete="off">
+        <input id="lg-rnew2" type="password" placeholder="Confirm new password" autocomplete="off">
+        <button class="lg-btn" id="lg-rsave">Save and sign in</button>
+      </div>
+      <div class="lg-err"></div>
+      <button class="lg-link" id="lg-rback">← Back to sign-in</button>
+    </div>
+  </div>
+  <button class="bios-lgbtn" id="biosbtn">⚙ BIOS Setup</button>
+  <div class="lg-credit">WinClone — a fanmade concept by thisisuhhplanetring · © 2026 · Not affiliated with Microsoft</div>
+</div>
+
+<!-- SHUTDOWN -->
+<div id="shutdown"><div class="spin"></div><div id="sd-text">Shutting down…</div></div>
+
+<!-- SCREEN SAVER -->
+<div id="screensaver"><div class="ss-logo">WinClone</div></div>
+
+<!-- UPDATE -->
+<div id="update">
+  <div class="spin"></div>
+  <div class="upd-title">Working on updates</div>
+  <div id="upd-pct">0% complete</div>
+  <div id="upd-msg">Getting things ready</div>
+  <div class="upd-warn">Don't turn off your PC. This will take a while.</div>
+</div>
+
+<!-- BSOD -->
+<div id="bsod">
+  <div class="sad">:(</div>
+  <div class="t1">Your PC ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.</div>
+  <div class="pct"><span id="bsod-pct">0</span>% complete</div>
+  <div class="code">Stop code: <span id="bsod-code">CRITICAL_PROCESS_DIED</span><br>
+    What failed: <span id="bsod-what">systemwinclone.sys</span><br><br>
+    Tip: you can factory-reset WinClone from the “⚙ BIOS Setup” button on the sign-in screen.</div>
+</div>
+
+<!-- hidden real-file import input -->
+<input type="file" id="fileimport" accept="image/*" multiple style="display:none">
+
+<!-- MALWARE OVERLAYS -->
+<div id="heat"></div>
+<div id="ransom"></div>
+
+<!-- RECOVERY (WinRE) -->
+<div id="recovery"></div>
+
+<!-- BIOS -->
+<div id="bios">
+  <div class="bios-head">WinClone BIOS Setup Utility — American Clonetrends v4.8</div>
+  <div class="bios-tabs"><span class="act">Main</span><span>Advanced</span><span>Boot</span><span>Exit</span></div>
+  <div class="bios-body">
+    <div style="flex:1">
+      <div class="bios-opt">System Time ......... <span id="bios-time">--:--:--</span></div>
+      <div class="bios-opt">System Date ......... <span id="bios-date">--/--/----</span></div>
+      <div class="bios-opt">Processor ........... WinClone Core i9 @ 3.60GHz</div>
+      <div class="bios-opt">Installed Memory .... 32768 MB OK</div>
+      <div class="bios-opt">System Health ....... <span id="bios-health">OK</span></div>
+      <br>
+      <div class="bios-opt hotable" id="bios-reset">&gt; Restore Factory Defaults (wipe &amp; reinstall WinClone)</div>
+      <div class="bios-opt hotable" id="bios-exit">&gt; Exit Without Saving</div>
+    </div>
+    <div class="bios-side">←→ Select Screen<br>↑↓ Select Item<br>Enter: Select<br>Esc: Exit<br><br>
+      <b>Restore Factory Defaults</b> erases all files, downloads, settings and infections on <b>this PC only</b>, and reinstalls WinClone system files. Your other PCs and your WinClone Account are left alone. Use this if the system is corrupted.</div>
+  </div>
+  <div class="bios-foot">v4.8 (C)Copyright 2026, WinClone Megatrends, Inc.</div>
+</div>
+
+</body>
+</html>
