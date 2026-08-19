@@ -18,8 +18,18 @@
    Bump WC_VERSION every release and add a matching WC_CHANGELOG entry.
    After an update, the new version's changelog is shown once on the next
    sign-in ("What's new"), and `winver` in the Terminal reports the version. */
-const WC_VERSION = "2.2.0";
+const WC_VERSION = "2.3.0";
 const WC_CHANGELOG = {
+  "2.3.0": [
+    "🪄 WinLang — a programming language of WinClone's own. Variables, if/else, while, repeat, for, functions, lists and maps, with an editor, a Run button and its own .wl files.",
+    "🖌️ A drawing is a value. Type the word draw anywhere in your code and a box appears in the line — click it, sketch something on a transparent pad, and it becomes draw#1. Hand that to wl.display() and it lands on the canvas when the program runs.",
+    "🎨 Click the box again any time to keep drawing on it. The pictures ride along inside the .wl file itself, so one file is the whole thing: code and art together.",
+    "🖼️ sys.save_drawing() turns a drawing from your source code into a real .png in Pictures — openable in Photos, usable as a wallpaper.",
+    "😌 Made to be easy on purpose. say \"hi\" writes a line, show draw puts a picture on screen, and nothing needs a prefix — random(1,6) and wait(2) just work. Forget the name of something? ＋ Insert drops a working version of it straight into your code.",
+    "🌀 Programs can take over the whole screen: effect(\"shake\"), no_effects(), chaos() for all of them at once, and effect_power() for how hard they hit.",
+    "🧰 The rest of the PC is one word away — notify, read, write, ls, delete (to the Recycle Bin), open, apps, user, set_user, version, now. Paths take forward slashes, and \"Pictures/art.png\" finds your Pictures folder from wherever the program lives.",
+    "📄 New ▸ WinLang Program, double-click any .wl to run it, or type winlang file.wl in the Terminal. Eight examples live in Documents\\WinLang.",
+  ],
   "2.2.0": [
     "⏰ Task Scheduler. Things can run without you being there — every time you sign in, when WinClone starts up, every few minutes, or at a set time each day. A task can open an app or run one of your Python scripts.",
     "🐍 A script can schedule itself: winclone.schedule(\"thing.py\", \"logon\"). Which means something you run once can still be waiting for you after a restart, and getting rid of it means actually finding the task.",
@@ -153,6 +163,7 @@ const APPS = {
   mines:     {title:"Minesweeper",   icon:"💣", w:400, h:480, build:buildMines},
   snake:     {title:"Snake",         icon:"🐍", w:440, h:520, build:buildSnake},
   python:    {title:"Python",        icon:"🐍", w:840, h:620, build:buildPython},
+  winlang:   {title:"WinLang",       icon:"🪄", w:860, h:640, build:buildWinlang},
   doom:      {title:"CloneDOOM",     icon:"👹", w:800, h:560, build:buildDoom},
   restore:   {title:"System Restore Points", icon:"🛟", w:680, h:520, build:buildRestore},
   sched:     {title:"Task Scheduler", icon:"⏰", w:720, h:540, build:buildSched},
@@ -160,6 +171,7 @@ const APPS = {
   screenfx:  {title:"Screen FX",     icon:"🌀", w:620, h:600, build:buildScreenFX},
   archive:   {title:"Archive",       icon:"🗜️", w:560, h:420, build:buildArchive, hidden:true},
   pyrun:     {title:"Python",        icon:"🐍", w:660, h:520, build:buildPyRun, hidden:true},
+  wlrun:     {title:"WinLang",       icon:"🪄", w:660, h:540, build:buildWlRun, hidden:true},
   htmlview:  {title:"HTML Viewer",   icon:"🌐", w:760, h:560, build:buildHtmlView, hidden:true},
   batch:     {title:"cmd.exe",       icon:"⬛", w:640, h:400, build:buildBatch, hidden:true},
 };
@@ -184,17 +196,19 @@ const TILE_BG = {
   mines:   "linear-gradient(135deg,#92400e,#f59e0b)",
   snake:   "linear-gradient(135deg,#166534,#84cc16)",
   python:  "linear-gradient(135deg,#2b5b84,#ffd43b)",
+  winlang: "linear-gradient(135deg,#5a2ea6,#ff7ac8)",
   doom:    "linear-gradient(135deg,#5c1008,#c62d1f)",
   restore: "linear-gradient(135deg,#0f5c52,#2fb8a0)",
   sched:   "linear-gradient(135deg,#7c2d12,#f59e0b)",
   events:  "linear-gradient(135deg,#334155,#7c8ba1)",
   screenfx:"linear-gradient(135deg,#3b0764,#a855f7)",
   pyrun:   "linear-gradient(135deg,#2b5b84,#ffd43b)",
+  wlrun:   "linear-gradient(135deg,#5a2ea6,#ff7ac8)",
   archive: "linear-gradient(135deg,#6b7280,#d1d5db)",
   htmlview:"linear-gradient(135deg,#c2410c,#fb923c)",
   batch:   "linear-gradient(135deg,#18181b,#3f3f46)",
 };
-const PINNED = ["edgy","edge","mail","explorer","notepad","python","docs","calc","photos","settings","terminal","defender","restore","sched","events","recycle"];
+const PINNED = ["edgy","edge","mail","explorer","notepad","python","winlang","docs","calc","photos","settings","terminal","defender","restore","sched","events","recycle"];
 const TASKBAR_PINS = ["explorer","edgy","edge","mail","notepad","terminal"];
 const DESKTOP_ICONS = [
   {app:"recycle",  label:"Recycle Bin"},
@@ -209,6 +223,7 @@ const DESKTOP_ICONS = [
   {app:"mines",    label:"Minesweeper"},
   {app:"snake",    label:"Snake"},
   {app:"python",   label:"Python"},
+  {app:"winlang",  label:"WinLang"},
   {app:"doom",     label:"CloneDOOM"},
 ];
 
@@ -1394,15 +1409,29 @@ function buildTerminal(body){
         print("Running "+nm+" — see the Python window.");
         break;
       }
+      case "winlang": case "wl": {
+        if(!a){ openApp("winlang"); print("Opening WinLang…"); break; }
+        const fn=a.replace(/^"(.*)"$/,"$1");
+        const segs=batResolve(cwd,fn);
+        let nm=segs[segs.length-1];
+        const parent=nodeAt(segs.slice(0,-1));
+        let f=parent&&parent.children&&parent.children[nm];
+        if(!f && parent&&parent.children&&parent.children[nm+".wl"]){ nm=nm+".wl"; f=parent.children[nm]; }
+        if(!f||f.folder){ printHtml(`winlang: can't open <b>${esc(fn)}</b>: no such file`); break; }
+        openWlFile({path:segs.slice(0,-1),name:nm});
+        print("Running "+nm+" — see the WinLang window.");
+        break;
+      }
       case "start": case "open": if(APPS[args[0]]) openApp(args[0]); else print("Unknown app: "+(a||"")); break;
       case "exit": closeWin("terminal"); break;
       default: {
         if(APPS[c]){ openApp(c); break; }
         const kids=(node()||{}).children||{}, tok=parts[0];
         const bn = (kids[tok]&&!kids[tok].folder) ? tok
-          : (kids[tok+".bat"]?tok+".bat":kids[tok+".cmd"]?tok+".cmd":kids[tok+".py"]?tok+".py":null);
+          : (kids[tok+".bat"]?tok+".bat":kids[tok+".cmd"]?tok+".cmd":kids[tok+".py"]?tok+".py":kids[tok+".wl"]?tok+".wl":null);
         if(bn && /\.(bat|cmd)$/i.test(bn)){ openBatch({path:[...cwd],name:bn}); break; }
         if(bn && /\.py$/i.test(bn)){ openPyFile({path:[...cwd],name:bn}); break; }
+        if(bn && /\.wl$/i.test(bn)){ openWlFile({path:[...cwd],name:bn}); break; }
         printHtml(`'${esc(c)}' is not recognized as an internal or external command,<br>operable program or batch file.`);
       }
     }
@@ -7877,6 +7906,1942 @@ function pyHelpDialog(){
   }
 }
 
+/* ============================ WINLANG ============================
+   Atlas's own language. It runs inside WinClone, saves as .wl, and has one
+   thing no other language has: a picture is a value you draw by hand, inside
+   your source code. `draw` is a literal. Click the little box in the editor,
+   sketch something on a transparent pad, and wl.display(draw#1) paints it on
+   the window's canvas when the program runs.
+
+   How this section is laid out:
+     1. drawings          — the value type, painting it, thumbnails
+     2. the pad           — the small canvas you actually draw in
+     3. .wl files         — source and drawings living in one text file
+     4. lexer + parser    — winlang source -> AST
+     5. interpreter       — generator-based, so Stop always works and an
+                            infinite loop never freezes the browser
+     6. standard library  — wl.* (the language) and sys.* (WinClone itself)
+     7. the IDE, the file runner, the examples
+*/
+
+/* ---------------- 1. DRAWINGS ---------------- */
+/* A drawing is 160x160 of transparent space plus a list of strokes. Strokes,
+   not pixels: they stay small in the file, and you can reopen one and keep
+   drawing on it later. */
+const WL_DRAW_SIZE=160;
+const WL_COLORS=["#ffffff","#1a1a1a","#ff4d4d","#ff8a3d","#ffd93d","#4ade80",
+                 "#4cc2ff","#8b7bff","#ff7ac8","#9aa4ad"];
+
+function wlNewDrawing(){ return {__wl:"draw", w:WL_DRAW_SIZE, h:WL_DRAW_SIZE, st:[], _rev:0}; }
+function wlIsDrawing(v){ return !!(v && v.__wl==="draw"); }
+function wlCloneDrawing(d){
+  return {__wl:"draw", w:d.w||WL_DRAW_SIZE, h:d.h||WL_DRAW_SIZE, _rev:0,
+          st:(d.st||[]).map(s=>({c:s.c,w:s.w,e:s.e?1:0,p:(s.p||[]).slice()}))};
+}
+
+/* Paint the strokes onto a context. The eraser is destination-out, which is
+   why every drawing goes through its own offscreen canvas before it lands on
+   the stage — otherwise an eraser stroke would punch a hole through whatever
+   was already on the canvas underneath it. */
+function wlPaintStrokes(ctx,d,scale){
+  const st=d.st||[];
+  ctx.lineCap="round"; ctx.lineJoin="round";
+  for(const s of st){
+    const p=s.p||[];
+    if(p.length<2) continue;
+    ctx.save();
+    ctx.globalCompositeOperation=s.e?"destination-out":"source-over";
+    ctx.strokeStyle=s.c||"#ffffff";
+    ctx.lineWidth=Math.max(.4,(s.w||4)*scale);
+    ctx.beginPath();
+    ctx.moveTo(p[0]*scale,p[1]*scale);
+    if(p.length===2) ctx.lineTo(p[0]*scale+.01,p[1]*scale);   // a single dot still shows
+    else for(let i=2;i<p.length;i+=2) ctx.lineTo(p[i]*scale,p[i+1]*scale);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+function wlDrawingCanvas(d,scale){
+  scale=scale||1;
+  const c=document.createElement("canvas");
+  c.width =Math.max(1,Math.round((d.w||WL_DRAW_SIZE)*scale));
+  c.height=Math.max(1,Math.round((d.h||WL_DRAW_SIZE)*scale));
+  wlPaintStrokes(c.getContext("2d"),d,scale);
+  return c;
+}
+/* Thumbnails go in the editor's inline chips, so they get regenerated on every
+   repaint of the highlight layer — i.e. on every keystroke. Cache by revision. */
+const WL_THUMBS=new WeakMap();
+function wlThumbURL(d){
+  const rev=d._rev||0, hit=WL_THUMBS.get(d);
+  if(hit && hit.rev===rev) return hit.url;
+  let url="";
+  try{ url=wlDrawingCanvas(d,48/Math.max(1,d.w||WL_DRAW_SIZE)).toDataURL(); }catch(e){}
+  WL_THUMBS.set(d,{rev,url});
+  return url;
+}
+function wlDrawingEmpty(d){ return !d || !d.st || !d.st.length; }
+
+/* ---------------- 2. THE PAD ---------------- */
+/* o = {drawing, label, onDone(drawing)}. Cancel just closes; the caller's copy
+   is never touched until Done, because we edit a clone. */
+function wlDrawPad(o){
+  o=o||{};
+  const d=o.drawing?wlCloneDrawing(o.drawing):wlNewDrawing();
+  const back=el("div","wl-padback");
+  const pad=el("div","wl-pad");
+  pad.innerHTML=`
+    <div class="wl-pad-head"><span>🖌️ ${esc(o.label||"Drawing")}</span><button class="x" title="Cancel">✕</button></div>
+    <div class="wl-pad-body">
+      <div class="wl-pad-stage"><canvas class="wl-pad-canvas" width="${WL_DRAW_SIZE*2}" height="${WL_DRAW_SIZE*2}"></canvas></div>
+      <div class="wl-pad-tools">
+        <div class="wl-swatches"></div>
+        <label class="wl-row">Brush <input type="range" class="wl-size" min="1" max="20" value="5"><b class="wl-sizeval">5</b></label>
+        <div class="wl-row">
+          <button class="wl-tbtn on" data-t="pen">✏️ Pen</button>
+          <button class="wl-tbtn" data-t="eraser">🧽 Eraser</button>
+        </div>
+        <div class="wl-row">
+          <button class="wl-tbtn" data-a="undo">↶ Undo</button>
+          <button class="wl-tbtn" data-a="clear">🗑️ Clear</button>
+        </div>
+        <p class="wl-pad-note">The checkerboard is nothing — the background stays
+        transparent, so only what you draw ends up in your program.</p>
+      </div>
+    </div>
+    <div class="wl-pad-foot"><button class="dlg-btn pri" data-a="done">Done</button><button class="dlg-btn" data-a="cancel">Cancel</button></div>`;
+  document.body.appendChild(back);
+  document.body.appendChild(pad);
+  pad.style.zIndex=(back.style.zIndex=90000+(++state.z))+1;
+
+  const cv=pad.querySelector(".wl-pad-canvas");
+  const ctx=cv.getContext("2d");
+  const swatches=pad.querySelector(".wl-swatches");
+  const sizeIn=pad.querySelector(".wl-size");
+  const sizeVal=pad.querySelector(".wl-sizeval");
+  let color=WL_COLORS[0], size=5, tool="pen", cur=null;
+
+  WL_COLORS.forEach((c,i)=>{
+    const b=el("button","wl-sw"+(i===0?" on":""));
+    b.style.background=c; b.title=c;
+    b.onclick=()=>{
+      color=c; tool="pen";
+      swatches.querySelectorAll(".wl-sw").forEach(x=>x.classList.remove("on"));
+      b.classList.add("on");
+      pad.querySelectorAll("[data-t]").forEach(x=>x.classList.toggle("on",x.dataset.t==="pen"));
+    };
+    swatches.appendChild(b);
+  });
+
+  /* the pad paints at 2x so the lines don't come out soft, but every
+     coordinate that gets stored is in the drawing's own 160-wide space */
+  const PZ=2;
+  const repaint=()=>{ ctx.clearRect(0,0,cv.width,cv.height); wlPaintStrokes(ctx,d,PZ); };
+  repaint();
+
+  const at=(e)=>{
+    const r=cv.getBoundingClientRect();
+    return [ (e.clientX-r.left)*cv.width/r.width/PZ, (e.clientY-r.top)*cv.height/r.height/PZ ];
+  };
+  const down=(e)=>{
+    e.preventDefault();
+    const [x,y]=at(e);
+    cur={c:color,w:size,e:tool==="eraser"?1:0,p:[Math.round(x*10)/10,Math.round(y*10)/10]};
+    d.st.push(cur); repaint();
+    try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+  };
+  const move=(e)=>{
+    if(!cur) return;
+    const [x,y]=at(e);
+    const n=cur.p.length;
+    /* skip points closer than a pixel — keeps the saved file small without
+       making the line look any different */
+    if(n>=2 && Math.abs(cur.p[n-2]-x)<1 && Math.abs(cur.p[n-1]-y)<1) return;
+    cur.p.push(Math.round(x*10)/10,Math.round(y*10)/10);
+    repaint();
+  };
+  const up=()=>{ cur=null; };
+  cv.addEventListener("pointerdown",down);
+  cv.addEventListener("pointermove",move);
+  addEventListener("pointerup",up);
+
+  sizeIn.oninput=()=>{ size=+sizeIn.value; sizeVal.textContent=size; };
+
+  const close=()=>{
+    removeEventListener("pointerup",up);
+    removeEventListener("keydown",key,true);
+    pad.remove(); back.remove();
+  };
+  const key=(e)=>{
+    if(e.key==="Escape"){ e.preventDefault(); close(); }
+    else if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); finish(); }
+    else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){ e.preventDefault(); d.st.pop(); repaint(); }
+  };
+  const finish=()=>{ d._rev=(d._rev||0)+1; close(); if(o.onDone) o.onDone(d); };
+  addEventListener("keydown",key,true);
+
+  pad.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{
+    tool=b.dataset.t;
+    pad.querySelectorAll("[data-t]").forEach(x=>x.classList.toggle("on",x===b));
+  });
+  pad.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.a;
+    if(a==="undo"){ d.st.pop(); repaint(); }
+    else if(a==="clear"){ d.st.length=0; repaint(); }
+    else if(a==="done") finish();
+    else close();
+  });
+  pad.querySelector(".x").onclick=close;
+  back.onclick=close;
+  return pad;
+}
+
+/* ---------------- 3. .wl FILES ---------------- */
+/* One file holds the code and the pictures. The drawings are appended as
+   `#::wl <id> <json>` lines, which are ordinary winlang comments — so a .wl
+   file opened in Notepad is still readable, still valid, and still runs. */
+function wlSplitFile(text){
+  const draws=new Map();
+  const src=[];
+  /* every line the format owns starts with #:: — the drawings themselves and
+     the little header above them. All of them come back out on load, so saving
+     the same file twice doesn't stack up a second copy of the block. */
+  String(text==null?"":text).split("\n").forEach(line=>{
+    if(!/^#::/.test(line)){ src.push(line); return; }
+    const m=/^#::wl\s+(\d+)\s+(\{.*\})\s*$/.exec(line);
+    if(!m) return;
+    try{
+      const j=JSON.parse(m[2]);
+      draws.set(+m[1],{__wl:"draw",w:j.w||WL_DRAW_SIZE,h:j.h||WL_DRAW_SIZE,st:j.st||[],_rev:0});
+    }catch(e){}
+  });
+  while(src.length && !src[src.length-1].trim()) src.pop();
+  return {src:src.join("\n"), draws};
+}
+function wlJoinFile(src,draws){
+  let out=String(src==null?"":src).replace(/\s+$/,"");
+  if(draws && draws.size){
+    const ids=[...draws.keys()].sort((a,b)=>a-b);
+    out+="\n\n#:: drawings made in the WinLang editor — leave these lines alone";
+    for(const id of ids){
+      const d=draws.get(id);
+      out+="\n#::wl "+id+" "+JSON.stringify({w:d.w,h:d.h,st:d.st});
+    }
+  }
+  return out+"\n";
+}
+function wlNextDrawId(draws){
+  let n=1; while(draws.has(n)) n++; return n;
+}
+
+/* ---------------- 4. LEXER + PARSER ---------------- */
+function wlErr(kind,msg,line){ return {__wlerr:1,kind:kind,msg:msg,line:line||0}; }
+
+const WL_KEYWORDS=["let","if","else","while","repeat","for","in","fn","give",
+                   "break","skip","true","false","nothing","and","or","not","say","show"];
+const WL_OPS=["..","==","!=","<=",">=","<",">","+","-","*","/","%","=",
+              "(",")","[","]","{","}",",",".",":",";"];
+
+function wlLex(src){
+  const T=[]; let i=0, line=1;
+  const s=String(src==null?"":src);
+  const push=(t,v)=>T.push({t,v,line});
+  while(i<s.length){
+    const c=s[i];
+    if(c==="\r"){ i++; continue; }
+    if(c==="\n"){ push("nl"); line++; i++; continue; }
+    if(c===" "||c==="\t"){ i++; continue; }
+    /* `draw` and `draw#7` are picture literals, and they have to be spotted
+       before `#` gets treated as the start of a comment */
+    if(/[A-Za-z_]/.test(c)){
+      let j=i; while(j<s.length && /[A-Za-z0-9_]/.test(s[j])) j++;
+      const word=s.slice(i,j);
+      if(word==="draw"){
+        const m=/^#(\d+)/.exec(s.slice(j));
+        if(m){ push("draw",+m[1]); i=j+m[0].length; }
+        else  { push("draw",null); i=j; }
+        continue;
+      }
+      i=j;
+      push(WL_KEYWORDS.indexOf(word)>=0?"kw":"name",word);
+      continue;
+    }
+    if(c==="#"){ while(i<s.length && s[i]!=="\n") i++; continue; }
+    if(/[0-9]/.test(c)){
+      let j=i;
+      while(j<s.length && /[0-9]/.test(s[j])) j++;
+      /* stop before the `..` in 0..10, but take the dot in 1.5 */
+      if(s[j]==="." && s[j+1]!=="." && /[0-9]/.test(s[j+1]||"")){
+        j++; while(j<s.length && /[0-9]/.test(s[j])) j++;
+      }
+      push("num",parseFloat(s.slice(i,j))); i=j; continue;
+    }
+    if(c==='"'||c==="'"){
+      const q=c; let j=i+1, out="";
+      while(j<s.length && s[j]!==q){
+        if(s[j]==="\\"){
+          const n=s[j+1];
+          out += n==="n"?"\n" : n==="t"?"\t" : n==="r"?"\r" : n==="\\"?"\\" : n===q?q : "\\"+(n||"");
+          j+=2; continue;
+        }
+        if(s[j]==="\n") throw wlErr("SyntaxError","this text never gets closed — add a "+q+" at the end of it",line);
+        out+=s[j++];
+      }
+      if(j>=s.length) throw wlErr("SyntaxError","this text never gets closed — add a "+q+" at the end of it",line);
+      push("str",out); i=j+1; continue;
+    }
+    const two=s.slice(i,i+2);
+    if(WL_OPS.indexOf(two)>=0){ push("op",two); i+=2; continue; }
+    if(WL_OPS.indexOf(c)>=0){ push("op",c); i++; continue; }
+    throw wlErr("SyntaxError","I don't know what to do with '"+c+"' here",line);
+  }
+  push("eof");
+  return T;
+}
+
+function wlParse(src){
+  const T=wlLex(src);
+  let p=0, noBrace=0;
+  const peek=(k)=>T[p+(k||0)];
+  const at=(t,v)=>{ const x=T[p]; return x.t===t && (v===undefined||x.v===v); };
+  const line=()=>T[p].line;
+  const eat=(t,v)=>{ if(at(t,v)){ return T[p++]; } return null; };
+  const shown=()=>{ const x=T[p]; return x.t==="eof"?"the end of the file":x.t==="nl"?"the end of the line":"'"+x.v+"'"; };
+  const need=(t,v,what)=>{
+    const x=eat(t,v);
+    if(!x) throw wlErr("SyntaxError","I expected "+(what||"'"+v+"'")+" here, but found "+shown(),line());
+    return x;
+  };
+  const skipNl=()=>{ while(at("nl")||at("op",";")) p++; };
+  /* One statement per line, with two escapes: a ; separates two of them, and
+     anything that ends in a } has already said where it stops — so
+     `if ready { go() } say "done"` reads fine and needs no punctuation. */
+  const endStmt=()=>{
+    if(at("eof")||at("op","}")) return;
+    if(at("nl")||at("op",";")){ skipNl(); return; }
+    throw wlErr("SyntaxError","I got to "+shown()+" and didn't expect it — put it on its own line, or separate the two with a ;",line());
+  };
+
+  function block(){
+    need("op","{","a { to start this block");
+    skipNl();
+    const body=[];
+    while(!at("op","}")){
+      if(at("eof")) throw wlErr("SyntaxError","this block is never closed — it needs a } somewhere",line());
+      body.push(stmt());
+      skipNl();
+    }
+    need("op","}");
+    return body;
+  }
+  /* the count/condition of if, while, repeat and for is parsed with map
+     literals switched off, so `repeat 3 {` reads as a block and not as a map */
+  function head(){ noBrace++; const e=expr(); noBrace--; return e; }
+
+  function stmt(){
+    const ln=line();
+    if(at("kw","let")){
+      p++;
+      const n=need("name",undefined,"a name for your variable").v;
+      need("op","=","an = (a let always gives the variable a starting value)");
+      skipNl();
+      const e=expr(); endStmt();
+      return {k:"let",name:n,e,line:ln};
+    }
+    if(at("kw","fn")){
+      p++;
+      const n=need("name",undefined,"a name for your function").v;
+      need("op","(","a ( after the function name");
+      const params=[];
+      skipNl();
+      while(!at("op",")")){
+        params.push(need("name",undefined,"a parameter name").v);
+        skipNl();
+        if(!eat("op",",")) break;
+        skipNl();
+      }
+      need("op",")");
+      const body=block();
+      return {k:"fn",name:n,params,body,line:ln};
+    }
+    if(at("kw","if"))     return ifStmt();
+    if(at("kw","while")){ p++; const c=head(); return {k:"while",cond:c,body:block(),line:ln}; }
+    if(at("kw","repeat")){p++; const n=head(); return {k:"repeat",n,body:block(),line:ln}; }
+    if(at("kw","for")){
+      p++;
+      const n=need("name",undefined,"a name for the loop variable").v;
+      need("kw","in","the word 'in' (for i in 0..10 { … })");
+      const e=head();
+      return {k:"for",name:n,e,body:block(),line:ln};
+    }
+    if(at("kw","give")){
+      p++;
+      const e=(at("nl")||at("eof")||at("op","}"))?null:expr();
+      endStmt();
+      return {k:"give",e,line:ln};
+    }
+    if(at("kw","break")){ p++; endStmt(); return {k:"break",line:ln}; }
+    if(at("kw","skip")){  p++; endStmt(); return {k:"skip",line:ln}; }
+    /* `say` writes to the console, `show` puts it on the canvas. Both take a
+       list of things and neither needs brackets — they're the two lines a
+       first program is made of. */
+    if(at("kw","say")||at("kw","show")){
+      const which=T[p++].v;
+      const args=[];
+      if(!at("nl")&&!at("eof")&&!at("op","}")&&!at("op",";")){
+        args.push(expr());
+        while(eat("op",",")){ skipNl(); args.push(expr()); }
+      }
+      endStmt();
+      return {k:which,args,line:ln};
+    }
+    const e=expr();
+    if(at("op","=")){
+      p++; skipNl();
+      const v=expr(); endStmt();
+      if(e.k!=="name"&&e.k!=="index"&&e.k!=="dot")
+        throw wlErr("SyntaxError","you can only put a value into a variable, a list slot or a map key",ln);
+      return {k:"assign",target:e,e:v,line:ln};
+    }
+    endStmt();
+    return {k:"expr",e,line:ln};
+  }
+  function ifStmt(){
+    const ln=line();
+    need("kw","if");
+    const cond=head(), then=block();
+    let els=null;
+    /* an else on the next line still belongs to this if */
+    const save=p; skipNl();
+    if(at("kw","else")){
+      p++;
+      if(at("kw","if")) els=[ifStmt()];
+      else els=block();
+    } else p=save;
+    return {k:"if",cond,then,els,line:ln};
+  }
+
+  /* precedence, loosest first */
+  function expr(){ return orE(); }
+  function orE(){
+    let a=andE();
+    while(at("kw","or")){ const ln=line(); p++; skipNl(); a={k:"bin",op:"or",a,b:andE(),line:ln}; }
+    return a;
+  }
+  function andE(){
+    let a=notE();
+    while(at("kw","and")){ const ln=line(); p++; skipNl(); a={k:"bin",op:"and",a,b:notE(),line:ln}; }
+    return a;
+  }
+  function notE(){
+    if(at("kw","not")){ const ln=line(); p++; skipNl(); return {k:"un",op:"not",a:notE(),line:ln}; }
+    return rangeE();
+  }
+  function rangeE(){
+    const a=cmpE();
+    if(at("op","..")){ const ln=line(); p++; skipNl(); return {k:"range",a,b:cmpE(),line:ln}; }
+    return a;
+  }
+  function cmpE(){
+    let a=addE();
+    while(at("op","==")||at("op","!=")||at("op","<")||at("op",">")||at("op","<=")||at("op",">=")){
+      const ln=line(), op=T[p++].v; skipNl();
+      a={k:"bin",op,a,b:addE(),line:ln};
+    }
+    return a;
+  }
+  function addE(){
+    let a=mulE();
+    while(at("op","+")||at("op","-")){ const ln=line(), op=T[p++].v; skipNl(); a={k:"bin",op,a,b:mulE(),line:ln}; }
+    return a;
+  }
+  function mulE(){
+    let a=unE();
+    while(at("op","*")||at("op","/")||at("op","%")){ const ln=line(), op=T[p++].v; skipNl(); a={k:"bin",op,a,b:unE(),line:ln}; }
+    return a;
+  }
+  function unE(){
+    if(at("op","-")){ const ln=line(); p++; return {k:"un",op:"-",a:unE(),line:ln}; }
+    return postE();
+  }
+  function postE(){
+    let a=primary();
+    for(;;){
+      const ln=line();
+      if(at("op","(")){
+        p++; skipNl();
+        const args=[];
+        while(!at("op",")")){
+          args.push(expr()); skipNl();
+          if(!eat("op",",")) break;
+          skipNl();
+        }
+        need("op",")","a ) to close this call");
+        a={k:"call",fn:a,args,line:ln};
+      } else if(at("op","[")){
+        p++; skipNl();
+        const i=expr(); skipNl();
+        need("op","]","a ] to close this");
+        a={k:"index",o:a,i,line:ln};
+      } else if(at("op",".")){
+        p++;
+        const n=T[p];
+        if(n.t!=="name"&&n.t!=="kw") throw wlErr("SyntaxError","I expected a name after the dot",ln);
+        p++;
+        a={k:"dot",o:a,name:n.v,line:ln};
+      } else return a;
+    }
+  }
+  function primary(){
+    const ln=line(), x=T[p];
+    if(x.t==="num"){ p++; return {k:"num",v:x.v,line:ln}; }
+    if(x.t==="str"){ p++; return {k:"str",v:x.v,line:ln}; }
+    if(x.t==="draw"){ p++; return {k:"draw",id:x.v,line:ln}; }
+    if(x.t==="name"){ p++; return {k:"name",v:x.v,line:ln}; }
+    if(x.t==="kw"){
+      if(x.v==="true"){ p++; return {k:"bool",v:true,line:ln}; }
+      if(x.v==="false"){ p++; return {k:"bool",v:false,line:ln}; }
+      if(x.v==="nothing"){ p++; return {k:"nothing",line:ln}; }
+      throw wlErr("SyntaxError","'"+x.v+"' can't be used as a value here",ln);
+    }
+    if(at("op","(")){
+      p++; skipNl();
+      const e=expr(); skipNl();
+      need("op",")","a ) to close this");
+      return e;
+    }
+    if(at("op","[")){
+      p++; skipNl();
+      const items=[];
+      while(!at("op","]")){
+        items.push(expr()); skipNl();
+        if(!eat("op",",")) break;
+        skipNl();
+      }
+      need("op","]","a ] to close this list");
+      return {k:"list",items,line:ln};
+    }
+    if(at("op","{") && !noBrace){
+      p++; skipNl();
+      const pairs=[];
+      while(!at("op","}")){
+        const kx=T[p];
+        let key;
+        if(kx.t==="str"||kx.t==="num"){ p++; key={k:kx.t==="str"?"str":"num",v:kx.v,line:ln}; }
+        else if(kx.t==="name"){ p++; key={k:"str",v:kx.v,line:ln}; }
+        else throw wlErr("SyntaxError","a map key has to be a name or a piece of text",ln);
+        need("op",":","a : between the key and its value");
+        skipNl();
+        pairs.push([key,expr()]); skipNl();
+        if(!eat("op",",")) break;
+        skipNl();
+      }
+      need("op","}","a } to close this map");
+      return {k:"map",pairs,line:ln};
+    }
+    throw wlErr("SyntaxError","I expected a value here, but found "+shown(),ln);
+  }
+
+  skipNl();
+  const prog=[];
+  while(!at("eof")){ prog.push(stmt()); skipNl(); }
+  return prog;
+}
+
+/* ---------------- 5. INTERPRETER ---------------- */
+/* Everything below is a generator. That's the whole trick behind Stop working
+   and `while true` not locking up the tab: the evaluator yields on every loop
+   turn and every call, and the driver in wlRun decides whether to carry on,
+   hand the frame back to the browser, or drop the program. */
+
+function wlEnv(parent){ return {vars:new Map(), parent:parent||null}; }
+function wlFind(env,name){ let e=env; while(e){ if(e.vars.has(name)) return e; e=e.parent; } return null; }
+
+function wlTypeName(v){
+  if(v===null||v===undefined) return "nothing";
+  if(typeof v==="number") return "a number";
+  if(typeof v==="string") return "text";
+  if(typeof v==="boolean") return "true/false";
+  if(Array.isArray(v)) return "a list";
+  if(v instanceof Map) return "a map";
+  if(v.__wl==="draw") return "a drawing";
+  if(v.__wl==="fn"||v.__wl==="nat") return "a function";
+  if(v.__wl==="ns") return "a toolbox";
+  return "a value";
+}
+function wlNum(v,ln,what){
+  if(typeof v==="number") return v;
+  if(typeof v==="boolean") return v?1:0;
+  throw wlErr("TypeError",(what||"this")+" needs a number, but got "+wlTypeName(v),ln);
+}
+function wlStr(v){
+  if(v===null||v===undefined) return "nothing";
+  if(typeof v==="string") return v;
+  if(typeof v==="boolean") return v?"true":"false";
+  if(typeof v==="number") return Number.isFinite(v)?(Object.is(v,-0)?"0":String(v)):(v>0?"infinity":v<0?"-infinity":"not a number");
+  if(Array.isArray(v)) return "["+v.map(wlStr).join(", ")+"]";
+  if(v instanceof Map) return "{"+[...v.entries()].map(([k,x])=>wlStr(k)+": "+wlStr(x)).join(", ")+"}";
+  if(v.__wl==="draw") return "drawing("+v.w+"x"+v.h+", "+(v.st?v.st.length:0)+" strokes)";
+  if(v.__wl==="fn"||v.__wl==="nat") return "function "+(v.name||"?");
+  if(v.__wl==="ns") return "toolbox "+v.name;
+  return String(v);
+}
+function wlTruth(v){
+  if(v===null||v===undefined||v===false) return false;
+  if(v===true) return true;
+  if(typeof v==="number") return v!==0;
+  if(typeof v==="string") return v.length>0;
+  if(Array.isArray(v)) return v.length>0;
+  if(v instanceof Map) return v.size>0;
+  return true;
+}
+function wlEq(a,b){
+  if(a===null||a===undefined) return b===null||b===undefined;
+  if(typeof a==="number"&&typeof b==="number") return a===b;
+  if(typeof a==="string"&&typeof b==="string") return a===b;
+  if(typeof a==="boolean"||typeof b==="boolean") return a===b;
+  if(Array.isArray(a)&&Array.isArray(b)) return a.length===b.length && a.every((x,i)=>wlEq(x,b[i]));
+  return a===b;
+}
+/* map keys are compared by value, so m["a"] and m["a"] are the same slot even
+   though they're different JS strings */
+function wlKey(k){ return (typeof k==="number"||typeof k==="string"||typeof k==="boolean")?k:wlStr(k); }
+
+const WL_BREAK={__wlctl:"break"}, WL_SKIP={__wlctl:"skip"};
+
+function* wlCall(f,args,R,ln){
+  if(f&&f.__wl==="nat"){
+    if(f.gen) return yield* f.fn(args,R,ln);
+    return f.fn(args,R,ln);
+  }
+  if(f&&f.__wl==="fn"){
+    if(args.length!==f.params.length)
+      throw wlErr("ArgumentError",f.name+"() wants "+f.params.length+" thing"+(f.params.length===1?"":"s")+
+        " ("+(f.params.join(", ")||"nothing")+") but got "+args.length,ln);
+    const env=wlEnv(f.env);
+    f.params.forEach((p,i)=>env.vars.set(p,args[i]));
+    if(++R.depth>160){ R.depth--; throw wlErr("TooDeep",f.name+"() keeps calling itself and never stops",ln); }
+    try{
+      yield 0;
+      yield* wlBlock(f.body,env,R);
+      return null;
+    }catch(e){
+      if(e&&e.__wlctl==="give") return e.v;
+      throw e;
+    }finally{ R.depth--; }
+  }
+  throw wlErr("TypeError",wlTypeName(f)+" isn't something you can call — did you mean to leave off the ()?",ln);
+}
+
+function* wlBlock(body,env,R){
+  for(const s of body) yield* wlExec(s,env,R);
+}
+
+function* wlExec(n,env,R){
+  switch(n.k){
+    case "let":{
+      const v=yield* wlEval(n.e,env,R);
+      env.vars.set(n.name,v);
+      return;
+    }
+    case "assign":{
+      const v=yield* wlEval(n.e,env,R);
+      const t=n.target;
+      if(t.k==="name"){
+        const e=wlFind(env,t.v);
+        if(!e) throw wlErr("NameError","there's no variable called '"+t.v+"' yet — start it with: let "+t.v+" = "+wlStr(v),n.line);
+        e.vars.set(t.v,v);
+      } else if(t.k==="index"){
+        const o=yield* wlEval(t.o,env,R);
+        const i=yield* wlEval(t.i,env,R);
+        if(Array.isArray(o)){
+          let ix=wlNum(i,n.line,"a list position");
+          if(ix<0) ix+=o.length;
+          if(ix<0||ix>=o.length||ix!==Math.floor(ix))
+            throw wlErr("RangeError","that list only has "+o.length+" thing"+(o.length===1?"":"s")+", so slot "+wlStr(i)+" isn't there",n.line);
+          o[ix]=v;
+        } else if(o instanceof Map) o.set(wlKey(i),v);
+        else throw wlErr("TypeError","you can only put things into a list or a map, not "+wlTypeName(o),n.line);
+      } else {
+        const o=yield* wlEval(t.o,env,R);
+        if(o instanceof Map) o.set(t.name,v);
+        else throw wlErr("TypeError","you can't set ."+t.name+" on "+wlTypeName(o),n.line);
+      }
+      return;
+    }
+    case "say":{
+      const parts=[];
+      for(const a of n.args) parts.push(wlStr(yield* wlEval(a,env,R)));
+      R.io.write(parts.join(" ")+"\n");
+      return;
+    }
+    case "show":{
+      const vals=[];
+      for(const a of n.args) vals.push(yield* wlEval(a,env,R));
+      if(!vals.length) throw wlErr("ArgumentError","show needs something to show. Try: show draw",n.line);
+      wlDoDisplay(vals,R,n.line);
+      return;
+    }
+    case "expr": yield* wlEval(n.e,env,R); return;
+    case "if":{
+      if(wlTruth(yield* wlEval(n.cond,env,R))) yield* wlBlock(n.then,wlEnv(env),R);
+      else if(n.els) yield* wlBlock(n.els,wlEnv(env),R);
+      return;
+    }
+    case "while":{
+      let guard=0;
+      for(;;){
+        yield 0;
+        if(!wlTruth(yield* wlEval(n.cond,env,R))) return;
+        try{ yield* wlBlock(n.body,wlEnv(env),R); }
+        catch(e){ if(e===WL_BREAK) return; if(e!==WL_SKIP) throw e; }
+        if(++guard>5e7) throw wlErr("RuntimeError","this while loop has run 50 million times — something is keeping it alive",n.line);
+      }
+    }
+    case "repeat":{
+      const c=Math.floor(wlNum(yield* wlEval(n.n,env,R),n.line,"repeat"));
+      for(let i=0;i<c;i++){
+        yield 0;
+        try{ yield* wlBlock(n.body,wlEnv(env),R); }
+        catch(e){ if(e===WL_BREAK) return; if(e!==WL_SKIP) throw e; }
+      }
+      return;
+    }
+    case "for":{
+      const src=yield* wlEval(n.e,env,R);
+      let items;
+      if(Array.isArray(src)) items=src;
+      else if(typeof src==="string") items=[...src];
+      else if(src instanceof Map) items=[...src.keys()];
+      else throw wlErr("TypeError","a for loop needs a list, a range or some text — "+wlTypeName(src)+" can't be walked through",n.line);
+      for(let i=0;i<items.length;i++){
+        yield 0;
+        const inner=wlEnv(env);
+        inner.vars.set(n.name,items[i]);
+        try{ yield* wlBlock(n.body,inner,R); }
+        catch(e){ if(e===WL_BREAK) return; if(e!==WL_SKIP) throw e; }
+      }
+      return;
+    }
+    case "fn":
+      env.vars.set(n.name,{__wl:"fn",name:n.name,params:n.params,body:n.body,env});
+      return;
+    case "give": throw {__wlctl:"give",v:n.e?(yield* wlEval(n.e,env,R)):null};
+    case "break": throw WL_BREAK;
+    case "skip":  throw WL_SKIP;
+  }
+  throw wlErr("RuntimeError","I don't know how to run a "+n.k,n.line);
+}
+
+function* wlEval(n,env,R){
+  switch(n.k){
+    case "num": case "str": return n.v;
+    case "bool": return n.v;
+    case "nothing": return null;
+    case "draw":{
+      if(n.id===null)
+        throw wlErr("EmptyDrawing","this drawing box is still empty — click it in the editor and sketch something first",n.line);
+      const d=R.draws&&R.draws.get(n.id);
+      if(!d) throw wlErr("MissingDrawing","drawing #"+n.id+" isn't in this file any more",n.line);
+      return d;
+    }
+    case "name":{
+      const e=wlFind(env,n.v);
+      if(!e) throw wlErr("NameError","nothing here is called '"+n.v+"'"+(R.hint(n.v)||""),n.line);
+      return e.vars.get(n.v);
+    }
+    case "list":{
+      const out=[];
+      for(const it of n.items) out.push(yield* wlEval(it,env,R));
+      return out;
+    }
+    case "map":{
+      const m=new Map();
+      for(const [k,v] of n.pairs) m.set(wlKey(yield* wlEval(k,env,R)), yield* wlEval(v,env,R));
+      return m;
+    }
+    case "range":{
+      const a=Math.floor(wlNum(yield* wlEval(n.a,env,R),n.line,"the start of a range"));
+      const b=Math.floor(wlNum(yield* wlEval(n.b,env,R),n.line,"the end of a range"));
+      if(Math.abs(b-a)>200000) throw wlErr("RangeError","that range has "+Math.abs(b-a)+" numbers in it — too many to make a list from",n.line);
+      const out=[];
+      if(b>=a) for(let i=a;i<b;i++) out.push(i);
+      else      for(let i=a;i>b;i--) out.push(i);
+      return out;
+    }
+    case "un":{
+      const v=yield* wlEval(n.a,env,R);
+      if(n.op==="not") return !wlTruth(v);
+      return -wlNum(v,n.line,"a minus sign");
+    }
+    case "bin":{
+      if(n.op==="and"){ const a=yield* wlEval(n.a,env,R); return wlTruth(a)?(yield* wlEval(n.b,env,R)):a; }
+      if(n.op==="or"){  const a=yield* wlEval(n.a,env,R); return wlTruth(a)?a:(yield* wlEval(n.b,env,R)); }
+      const a=yield* wlEval(n.a,env,R), b=yield* wlEval(n.b,env,R);
+      return wlBin(n.op,a,b,n.line);
+    }
+    case "index":{
+      const o=yield* wlEval(n.o,env,R), i=yield* wlEval(n.i,env,R);
+      if(Array.isArray(o)||typeof o==="string"){
+        let ix=wlNum(i,n.line,"a position");
+        if(ix<0) ix+=o.length;
+        if(ix<0||ix>=o.length||ix!==Math.floor(ix))
+          throw wlErr("RangeError",(Array.isArray(o)?"that list has ":"that text has ")+o.length+
+            " thing"+(o.length===1?"":"s")+" in it, so "+wlStr(i)+" isn't there"+
+            (o.length?" (the first one is 0, the last is "+(o.length-1)+")":""),n.line);
+        return o[ix];
+      }
+      if(o instanceof Map){
+        const k=wlKey(i);
+        if(!o.has(k)) throw wlErr("KeyError","that map has no key called "+wlStr(i),n.line);
+        return o.get(k);
+      }
+      throw wlErr("TypeError","you can't look inside "+wlTypeName(o)+" with [ ]",n.line);
+    }
+    case "dot":{
+      const o=yield* wlEval(n.o,env,R);
+      if(o&&o.__wl==="ns"){
+        if(!o.members.has(n.name))
+          throw wlErr("NameError",o.name+"."+n.name+" doesn't exist. "+o.name+" has: "+[...o.members.keys()].join(", "),n.line);
+        return o.members.get(n.name);
+      }
+      if(o instanceof Map){
+        if(!o.has(n.name)) throw wlErr("KeyError","that map has no key called '"+n.name+"'",n.line);
+        return o.get(n.name);
+      }
+      if(Array.isArray(o)||typeof o==="string"){
+        if(n.name==="count") return o.length;
+        throw wlErr("NameError",wlTypeName(o)+" has .count, but not ."+n.name,n.line);
+      }
+      if(wlIsDrawing(o)){
+        if(n.name==="width")   return o.w;
+        if(n.name==="height")  return o.h;
+        if(n.name==="strokes") return (o.st||[]).length;
+        throw wlErr("NameError","a drawing has .width, .height and .strokes, but not ."+n.name,n.line);
+      }
+      throw wlErr("TypeError","you can't take ."+n.name+" out of "+wlTypeName(o),n.line);
+    }
+    case "call":{
+      const f=yield* wlEval(n.fn,env,R);
+      const args=[];
+      for(const a of n.args) args.push(yield* wlEval(a,env,R));
+      return yield* wlCall(f,args,R,n.line);
+    }
+  }
+  throw wlErr("RuntimeError","I don't know how to work out a "+n.k,n.line);
+}
+
+function wlBin(op,a,b,ln){
+  if(op==="=="){ return wlEq(a,b); }
+  if(op==="!="){ return !wlEq(a,b); }
+  if(op==="+"){
+    if(typeof a==="string"||typeof b==="string") return wlStr(a)+wlStr(b);
+    if(Array.isArray(a)&&Array.isArray(b)) return a.concat(b);
+    if(typeof a==="number"&&typeof b==="number") return a+b;
+    throw wlErr("TypeError","I can't add "+wlTypeName(a)+" and "+wlTypeName(b)+
+      ". To glue text together, make sure one side is text",ln);
+  }
+  if(op==="*"){
+    /* "ha" * 3 and [0] * 5 both make sense and both come up constantly */
+    if(typeof a==="string"&&typeof b==="number") return b>0?a.repeat(Math.min(10000,Math.floor(b))):"";
+    if(typeof b==="string"&&typeof a==="number") return a>0?b.repeat(Math.min(10000,Math.floor(a))):"";
+    if(Array.isArray(a)&&typeof b==="number"){
+      const out=[]; for(let i=0;i<Math.min(100000,Math.floor(b));i++) out.push(...a); return out;
+    }
+  }
+  if(op==="<"||op===">"||op==="<="||op===">="){
+    if(typeof a==="string"&&typeof b==="string")
+      return op==="<"?a<b:op===">"?a>b:op==="<="?a<=b:a>=b;
+  }
+  const x=wlNum(a,ln,"'"+op+"'"), y=wlNum(b,ln,"'"+op+"'");
+  switch(op){
+    case "-": return x-y;
+    case "*": return x*y;
+    case "/": if(y===0) throw wlErr("MathError","you can't divide by zero",ln); return x/y;
+    case "%": if(y===0) throw wlErr("MathError","you can't take the remainder of a division by zero",ln); return ((x%y)+y)%y;
+    case "<": return x<y;
+    case ">": return x>y;
+    case "<=":return x<=y;
+    case ">=":return x>=y;
+  }
+  throw wlErr("RuntimeError","I don't know the operator '"+op+"'",ln);
+}
+
+/* ---------------- 6. STANDARD LIBRARY ---------------- */
+function wlNat(name,fn){ return {__wl:"nat",name,fn}; }
+function wlNatG(name,fn){ return {__wl:"nat",name,fn,gen:true}; }
+function wlNs(name,obj){
+  const m=new Map();
+  Object.keys(obj).forEach(k=>m.set(k,obj[k]));
+  return {__wl:"ns",name,members:m};
+}
+function wlA(a,i,d){ return a.length>i?a[i]:d; }
+function wlAN(a,i,ln,who,d){
+  if(a.length<=i){ if(d!==undefined) return d; throw wlErr("ArgumentError",who+" needs a number here",ln); }
+  return wlNum(a[i],ln,who);
+}
+function wlAS(a,i,ln,who,d){
+  if(a.length<=i){ if(d!==undefined) return d; throw wlErr("ArgumentError",who+" needs some text here",ln); }
+  return wlStr(a[i]);
+}
+function wlAL(a,i,ln,who){
+  const v=wlA(a,i);
+  if(!Array.isArray(v)) throw wlErr("TypeError",who+" needs a list, not "+wlTypeName(v),ln);
+  return v;
+}
+function wlAD(a,i,ln,who){
+  const v=wlA(a,i);
+  if(!wlIsDrawing(v)) throw wlErr("TypeError",who+" needs a drawing, not "+wlTypeName(v),ln);
+  return v;
+}
+
+/* Turn a path the way a person writes it into the segment list the VFS wants.
+   Forward slashes are fine, so nobody has to double up backslashes inside a
+   piece of text — and a path that starts with one of your own folders is taken
+   from your home folder, so "Pictures/art.png" means what it looks like no
+   matter which folder the program is sitting in. */
+const WL_HOME_FOLDERS=["desktop","documents","downloads","music","pictures","videos"];
+function wlResolve(p,cwd){
+  const raw=String(p==null?"":p).replace(/\//g,"\\").trim();
+  const rel=raw.split("\\").filter(Boolean);
+  const base=(rel.length&&WL_HOME_FOLDERS.indexOf(rel[0].toLowerCase())>=0)?HOME_PATH:(cwd||HOME_PATH);
+  const parts=/^[A-Za-z]:/.test(raw)?raw.split("\\"):[...base,...raw.split("\\")];
+  const out=[];
+  for(const s of parts){
+    if(!s||s===".") continue;
+    if(s===".."){ out.pop(); continue; }
+    out.push(s);
+  }
+  return out;
+}
+function wlIconFor(name){
+  const lo=String(name).toLowerCase();
+  if(/\.wl$/.test(lo)) return "🪄";
+  if(/\.py$/.test(lo)) return "🐍";
+  if(/\.(png|jpe?g|gif|bmp|webp)$/.test(lo)) return "🖼️";
+  if(/\.(html?|json)$/.test(lo)) return "🗂️";
+  return "📄";
+}
+
+/* `show x` and `wl.display(x)` are the same call. One argument centres it and
+   scales it to fit; three place its top-left corner; a fourth resizes it. */
+function wlDoDisplay(a,R,ln){
+  if(!a.length) throw wlErr("ArgumentError","there's nothing to show. Put draw in the brackets and click the box that appears",ln);
+  const v=a[0], ctx=R.needCanvas(), st=R.stage;
+  const placed=a.length>=3;
+  const size=wlAN(a,3,ln,"show",1);
+  if(size<=0) throw wlErr("ArgumentError","a size of "+wlStr(size)+" would make it invisible",ln);
+
+  if(wlIsDrawing(v)){
+    /* paint it through its own canvas first: an eraser stroke has to bite out
+       of the picture, not out of whatever is already on the stage */
+    const fit=placed?size:Math.min(st.w/v.w,st.h/v.h)*size;
+    const c=wlDrawingCanvas(v,Math.max(.02,Math.min(24,fit)));
+    const x=placed?wlAN(a,1,ln,"show"):Math.round((st.w-c.width)/2);
+    const y=placed?wlAN(a,2,ln,"show"):Math.round((st.h-c.height)/2);
+    ctx.drawImage(c,Math.round(x),Math.round(y));
+    return v;
+  }
+  const txt=wlStr(v);
+  ctx.save();
+  ctx.font=Math.max(6,Math.round(20*size))+"px Consolas,'Courier New',monospace";
+  ctx.fillStyle="#ffffff";
+  ctx.textBaseline="top";
+  if(placed) ctx.fillText(txt,wlAN(a,1,ln,"show"),wlAN(a,2,ln,"show"));
+  else{
+    ctx.textAlign="center";
+    ctx.fillText(txt,st.w/2,Math.round(st.h/2-10*size));
+  }
+  ctx.restore();
+  return v;
+}
+
+function wlGlobals(R){
+  const g=wlEnv(null);
+  const S=()=>R.stage;
+
+  /* the canvas is made the moment a program first needs one, at a size that
+     fits the output pane without anyone having to ask for it */
+  R.needCanvas=(w,h)=>{
+    const st=S();
+    if(!st.ctx){
+      st.initCanvas(w||480,h||360);
+      st.ctx.clearRect(0,0,st.w,st.h);          // initCanvas paints it black; winlang starts empty
+    }
+    return st.ctx;
+  };
+
+  const wl={};
+
+  /* --- the headline act --- */
+  wl.display=wlNat("display",(a,R2,ln)=>wlDoDisplay(a,R,ln));
+
+  /* --- console --- */
+  wl.say=wlNat("say",(a)=>{ R.io.write(a.map(wlStr).join(" ")+"\n"); return null; });
+  wl.clear=wlNat("clear",()=>{ S().clear(); return null; });
+  wl.ask=wlNatG("ask",function*(a,R2,ln){
+    const q=a.length?wlStr(a[0]):"";
+    return yield {pause:"ask",prompt:q};
+  });
+  /* ask() always hands back text, so ask("age") + 1 quietly gives "181".
+     This one keeps asking until the answer really is a number. */
+  wl.ask_number=wlNatG("ask_number",function*(a,R2,ln){
+    const q=a.length?wlStr(a[0]):"";
+    for(;;){
+      const v=yield {pause:"ask",prompt:q};
+      const n=parseFloat(String(v).trim());
+      if(isFinite(n)) return n;
+      R.io.write("that isn't a number — try again\n");
+    }
+  });
+  wl.wait=wlNatG("wait",function*(a,R2,ln){
+    const s=wlAN(a,0,ln,"wl.wait",0);
+    yield {pause:"wait",ms:Math.max(0,Math.min(60000,s*1000))};
+    return null;
+  });
+
+  /* --- the canvas itself --- */
+  wl.canvas=wlNat("canvas",(a,R2,ln)=>{
+    const w=Math.round(wlAN(a,0,ln,"wl.canvas",480)), h=Math.round(wlAN(a,1,ln,"wl.canvas",360));
+    S().initCanvas(w,h);
+    S().ctx.clearRect(0,0,S().w,S().h);
+    return null;
+  });
+  wl.bg=wlNat("bg",(a,R2,ln)=>{
+    const ctx=R.needCanvas();
+    ctx.save();
+    ctx.globalCompositeOperation="source-over";
+    ctx.fillStyle=wlAS(a,0,ln,"wl.bg","#000000");
+    ctx.fillRect(0,0,S().w,S().h);
+    ctx.restore();
+    return null;
+  });
+  wl.wipe=wlNat("wipe",()=>{ const ctx=R.needCanvas(); ctx.clearRect(0,0,S().w,S().h); return null; });
+
+  /* --- drawings as values --- */
+  wl.tint=wlNat("tint",(a,R2,ln)=>{
+    const d=wlAD(a,0,ln,"wl.tint"), c=wlAS(a,1,ln,"wl.tint");
+    const out=wlCloneDrawing(d);
+    out.st.forEach(s=>{ if(!s.e) s.c=c; });
+    return out;
+  });
+  wl.flip=wlNat("flip",(a,R2,ln)=>{
+    const d=wlAD(a,0,ln,"wl.flip");
+    const out=wlCloneDrawing(d);
+    out.st.forEach(s=>{ for(let i=0;i<s.p.length;i+=2) s.p[i]=d.w-s.p[i]; });
+    return out;
+  });
+  wl.thicker=wlNat("thicker",(a,R2,ln)=>{
+    const d=wlAD(a,0,ln,"wl.thicker"), by=wlAN(a,1,ln,"wl.thicker",2);
+    const out=wlCloneDrawing(d);
+    out.st.forEach(s=>{ s.w=Math.max(.5,(s.w||4)+by); });
+    return out;
+  });
+
+  /* --- input while a program is running --- */
+  wl.key=wlNat("key",(a,R2,ln)=>S().held.has(wlAS(a,0,ln,"wl.key").toLowerCase()));
+  wl.mouse=wlNat("mouse",()=>{
+    const st=S(), m=new Map();
+    m.set("x",st.mx); m.set("y",st.my); m.set("down",!!st.mdown);
+    return m;
+  });
+
+  /* --- numbers --- */
+  wl.round=wlNat("round",(a,R2,ln)=>Math.round(wlAN(a,0,ln,"wl.round")));
+  wl.floor=wlNat("floor",(a,R2,ln)=>Math.floor(wlAN(a,0,ln,"wl.floor")));
+  wl.ceil =wlNat("ceil", (a,R2,ln)=>Math.ceil(wlAN(a,0,ln,"wl.ceil")));
+  wl.abs  =wlNat("abs",  (a,R2,ln)=>Math.abs(wlAN(a,0,ln,"wl.abs")));
+  wl.sqrt =wlNat("sqrt", (a,R2,ln)=>{
+    const x=wlAN(a,0,ln,"wl.sqrt");
+    if(x<0) throw wlErr("MathError","there's no square root of a negative number",ln);
+    return Math.sqrt(x);
+  });
+  wl.pow=wlNat("pow",(a,R2,ln)=>Math.pow(wlAN(a,0,ln,"wl.pow"),wlAN(a,1,ln,"wl.pow")));
+  wl.min=wlNat("min",(a,R2,ln)=>Math.min(...a.map(v=>wlNum(v,ln,"wl.min"))));
+  wl.max=wlNat("max",(a,R2,ln)=>Math.max(...a.map(v=>wlNum(v,ln,"wl.max"))));
+  wl.random=wlNat("random",(a,R2,ln)=>{
+    if(!a.length) return Math.random();
+    const lo=wlAN(a,0,ln,"wl.random"), hi=wlAN(a,1,ln,"wl.random",undefined);
+    if(a.length===1) return Math.floor(Math.random()*lo);
+    return Math.floor(Math.random()*(hi-lo+1))+lo;
+  });
+  wl.pick=wlNat("pick",(a,R2,ln)=>{
+    const l=wlAL(a,0,ln,"wl.pick");
+    if(!l.length) throw wlErr("RangeError","wl.pick() got an empty list, so there's nothing to pick",ln);
+    return l[Math.floor(Math.random()*l.length)];
+  });
+
+  /* --- text --- */
+  wl.text  =wlNat("text",(a)=>wlStr(wlA(a,0,null)));
+  wl.number=wlNat("number",(a,R2,ln)=>{
+    const v=wlA(a,0);
+    if(typeof v==="number") return v;
+    const n=parseFloat(String(v).trim());
+    if(!isFinite(n)) throw wlErr("ValueError","'"+wlStr(v)+"' isn't a number I can read",ln);
+    return n;
+  });
+  wl.upper=wlNat("upper",(a,R2,ln)=>wlAS(a,0,ln,"wl.upper").toUpperCase());
+  wl.lower=wlNat("lower",(a,R2,ln)=>wlAS(a,0,ln,"wl.lower").toLowerCase());
+  wl.trim =wlNat("trim", (a,R2,ln)=>wlAS(a,0,ln,"wl.trim").trim());
+  wl.split=wlNat("split",(a,R2,ln)=>wlAS(a,0,ln,"wl.split").split(wlAS(a,1,ln,"wl.split"," ")));
+  wl.join =wlNat("join", (a,R2,ln)=>wlAL(a,0,ln,"wl.join").map(wlStr).join(wlAS(a,1,ln,"wl.join","")));
+  wl.contains=wlNat("contains",(a,R2,ln)=>{
+    const h=wlA(a,0);
+    if(Array.isArray(h)) return h.some(x=>wlEq(x,wlA(a,1)));
+    if(h instanceof Map) return h.has(wlKey(wlA(a,1)));
+    return wlStr(h).indexOf(wlAS(a,1,ln,"wl.contains"))>=0;
+  });
+  wl.replace=wlNat("replace",(a,R2,ln)=>
+    wlAS(a,0,ln,"wl.replace").split(wlAS(a,1,ln,"wl.replace")).join(wlAS(a,2,ln,"wl.replace")));
+
+  /* --- lists and maps --- */
+  wl.len=wlNat("len",(a,R2,ln)=>{
+    const v=wlA(a,0);
+    if(Array.isArray(v)||typeof v==="string") return v.length;
+    if(v instanceof Map) return v.size;
+    throw wlErr("TypeError","wl.len() works on lists, maps and text — not "+wlTypeName(v),ln);
+  });
+  wl.push=wlNat("push",(a,R2,ln)=>{ const l=wlAL(a,0,ln,"wl.push"); for(let i=1;i<a.length;i++) l.push(a[i]); return l; });
+  wl.pop =wlNat("pop", (a,R2,ln)=>{
+    const l=wlAL(a,0,ln,"wl.pop");
+    if(!l.length) throw wlErr("RangeError","wl.pop() got an empty list, so there's nothing to take off it",ln);
+    return l.pop();
+  });
+  wl.remove=wlNat("remove",(a,R2,ln)=>{
+    const l=wlAL(a,0,ln,"wl.remove");
+    const i=l.findIndex(x=>wlEq(x,wlA(a,1)));
+    if(i>=0) l.splice(i,1);
+    return l;
+  });
+  wl.sort=wlNat("sort",(a,R2,ln)=>{
+    const l=wlAL(a,0,ln,"wl.sort").slice();
+    l.sort((x,y)=>{
+      if(typeof x==="number"&&typeof y==="number") return x-y;
+      return wlStr(x)<wlStr(y)?-1:wlStr(x)>wlStr(y)?1:0;
+    });
+    return l;
+  });
+  wl.reverse=wlNat("reverse",(a,R2,ln)=>wlAL(a,0,ln,"wl.reverse").slice().reverse());
+  wl.range=wlNat("range",(a,R2,ln)=>{
+    const lo=a.length>1?wlAN(a,0,ln,"wl.range"):0;
+    const hi=a.length>1?wlAN(a,1,ln,"wl.range"):wlAN(a,0,ln,"wl.range");
+    const out=[]; for(let i=Math.floor(lo);i<Math.floor(hi);i++) out.push(i);
+    return out;
+  });
+  wl.keys=wlNat("keys",(a,R2,ln)=>{
+    const m=wlA(a,0);
+    if(!(m instanceof Map)) throw wlErr("TypeError","wl.keys() needs a map, not "+wlTypeName(m),ln);
+    return [...m.keys()];
+  });
+  wl.has=wlNat("has",(a,R2,ln)=>{
+    const m=wlA(a,0);
+    if(!(m instanceof Map)) throw wlErr("TypeError","wl.has() needs a map, not "+wlTypeName(m),ln);
+    return m.has(wlKey(wlA(a,1)));
+  });
+
+  /* --- odds and ends --- */
+  wl.type=wlNat("type",(a)=>wlTypeName(wlA(a,0,null)));
+  wl.time=wlNat("time",()=>Math.round((performance.now()-R.start)/10)/100);
+  wl.beep=wlNat("beep",(a,R2,ln)=>{
+    S().tone(wlAN(a,0,ln,"wl.beep",440),wlAN(a,1,ln,"wl.beep",.12),wlAS(a,2,ln,"wl.beep","square"),.35);
+    return null;
+  });
+
+  /* --- sys: winlang reaching out into WinClone --- */
+  const sys={};
+  sys.notify=wlNat("notify",(a,R2,ln)=>{
+    notify({icon:"🪄",title:wlAS(a,0,ln,"sys.notify","WinLang"),body:wlAS(a,1,ln,"sys.notify","")});
+    return null;
+  });
+  sys.read=wlNat("read",(a,R2,ln)=>{
+    const segs=wlResolve(wlAS(a,0,ln,"sys.read"),R.cwd);
+    const parent=nodeAt(segs.slice(0,-1)), f=parent&&parent.children&&parent.children[segs[segs.length-1]];
+    if(!f) throw wlErr("FileNotFound","there's no file at "+segs.join("\\"),ln);
+    if(f.folder) throw wlErr("IsAFolder",segs[segs.length-1]+" is a folder, not a file",ln);
+    return String(f.content==null?"":f.content);
+  });
+  sys.write=wlNat("write",(a,R2,ln)=>{
+    const segs=wlResolve(wlAS(a,0,ln,"sys.write"),R.cwd);
+    const name=segs[segs.length-1], parent=nodeAt(segs.slice(0,-1));
+    if(!parent||!parent.children) throw wlErr("FileNotFound","there's no folder at "+segs.slice(0,-1).join("\\"),ln);
+    const ex=parent.children[name];
+    if(ex&&ex.folder) throw wlErr("IsAFolder",name+" is a folder, so a file can't take its place",ln);
+    parent.children[name]=Object.assign(ex||{icon:wlIconFor(name)},{content:wlAS(a,1,ln,"sys.write","")});
+    saveFS(); refreshFX();
+    return name;
+  });
+  sys.exists=wlNat("exists",(a,R2,ln)=>{
+    const segs=wlResolve(wlAS(a,0,ln,"sys.exists"),R.cwd);
+    const parent=nodeAt(segs.slice(0,-1));
+    return !!(parent&&parent.children&&parent.children[segs[segs.length-1]]);
+  });
+  sys.ls=wlNat("ls",(a,R2,ln)=>{
+    const segs=a.length?wlResolve(wlAS(a,0,ln,"sys.ls"),R.cwd):[...R.cwd];
+    const n=nodeAt(segs);
+    if(!n||!n.children) throw wlErr("FileNotFound","there's no folder at "+segs.join("\\"),ln);
+    return Object.keys(n.children).sort();
+  });
+  sys.open=wlNat("open",(a,R2,ln)=>{
+    const raw=wlAS(a,0,ln,"sys.open"), id=raw.toLowerCase();
+    if(APPS[id]&&!APPS[id].hidden){ openApp(id); return id; }
+    const segs=wlResolve(raw,R.cwd), name=segs[segs.length-1];
+    const parent=nodeAt(segs.slice(0,-1)), item=parent&&parent.children&&parent.children[name];
+    if(!item) throw wlErr("FileNotFound","'"+raw+"' isn't an app and isn't a file either. sys.apps() lists the apps",ln);
+    if(item.folder) openExplorerAt(segs); else fsOpen(segs.slice(0,-1),name,item);
+    return name;
+  });
+  sys.apps=wlNat("apps",()=>Object.keys(APPS).filter(k=>!APPS[k].hidden));
+  sys.delete=wlNat("delete",(a,R2,ln)=>{
+    const segs=wlResolve(wlAS(a,0,ln,"sys.delete"),R.cwd);
+    const name=segs[segs.length-1], parent=nodeAt(segs.slice(0,-1));
+    const item=parent&&parent.children&&parent.children[name];
+    if(!item) throw wlErr("FileNotFound","there's nothing called '"+name+"' to delete",ln);
+    if(item.sys) throw wlErr("Protected",name+" belongs to WinClone and can't be deleted",ln);
+    /* goes to the Recycle Bin, exactly like deleting it in Explorer would —
+       a one-line typo shouldn't be able to destroy anything for good */
+    deleteAt(segs.slice(0,-1),name);
+    return name;
+  });
+  sys.user=wlNat("user",()=>getUser());
+  sys.set_user=wlNat("set_user",(a,R2,ln)=>{
+    const want=wlAS(a,0,ln,"sys.set_user","").trim();
+    if(want.length>24) throw wlErr("ValueError","that name is too long — 24 characters at most",ln);
+    setUser(want);            // "" puts it back to the default
+    return getUser();
+  });
+
+  /* --- screen effects: the ones that escape the window --- */
+  sys.effects=wlNat("effects",()=>SFX_LIST.map(e=>e.id));
+  sys.effect=wlNat("effect",(a,R2,ln)=>{
+    const id=wlAS(a,0,ln,"sys.effect").toLowerCase().trim();
+    if(id==="off"||id==="none"){ sfxStopAll(); return "off"; }
+    if(id==="all"||id==="chaos"){ sfxAll(); return "all"; }
+    if(!SFX_BY_ID[id])
+      throw wlErr("ValueError","there's no screen effect called '"+id+"'. sys.effects() lists all "+SFX_LIST.length+" of them",ln);
+    sfxSet(id, a.length>1 ? wlTruth(a[1]) : true);
+    return id;
+  });
+  sys.no_effects=wlNat("no_effects",()=>{ sfxStopAll(); return null; });
+  sys.chaos=wlNat("chaos",()=>{ sfxAll(); return null; });
+  sys.effect_power=wlNat("effect_power",(a,R2,ln)=>{
+    sfxPower(wlAN(a,0,ln,"sys.effect_power",1));
+    return SFX.power;
+  });
+  sys.version=wlNat("version",()=>WC_VERSION);
+  sys.now=wlNat("now",()=>new Date().toLocaleTimeString());
+  /* the payoff for drawing in your source code: it comes out the other side as
+     a real picture file, sitting in Pictures, openable in Photos */
+  sys.save_drawing=wlNat("save_drawing",(a,R2,ln)=>{
+    const d=wlAD(a,0,ln,"sys.save_drawing");
+    let where=wlAS(a,1,ln,"sys.save_drawing","Pictures\\drawing.png");
+    if(!/\.png$/i.test(where)) where+=".png";
+    const segs=wlResolve(where,R.cwd), name=segs[segs.length-1], parent=nodeAt(segs.slice(0,-1));
+    if(!parent||!parent.children) throw wlErr("FileNotFound","there's no folder at "+segs.slice(0,-1).join("\\"),ln);
+    if(wlDrawingEmpty(d)) throw wlErr("EmptyDrawing","that drawing is empty, so the picture would be too",ln);
+    let url;
+    try{ url=wlDrawingCanvas(d,3).toDataURL("image/png"); }
+    catch(e){ throw wlErr("RuntimeError","that drawing couldn't be turned into a picture",ln); }
+    parent.children[name]=Object.assign(parent.children[name]||{},{icon:"🖼️",img:url});
+    delete parent.children[name].content;
+    saveFS(); refreshFX();
+    return segs.join("\\");
+  });
+
+  g.vars.set("wl",wlNs("wl",wl));
+  g.vars.set("sys",wlNs("sys",sys));
+  /* Every one of them also answers to its plain name, so display(x) and
+     wl.display(x) are both right and nobody has to remember which toolbox a
+     thing lives in. The prefixes still work, and still group things in Help.
+     `say` is left out because it's a keyword already. */
+  Object.keys(wl ).forEach(k=>{ if(k!=="say") g.vars.set(k,wl[k]); });
+  Object.keys(sys).forEach(k=>{ g.vars.set(k,sys[k]); });
+
+  R.hint=(name)=>{
+    if(name==="print") return " — winlang says it with: say \"hello\"";
+    if(name==="draw_it"||name==="paint"||name==="image") return " — to put something on the canvas: show draw";
+    if(name==="def"||name==="function") return " — winlang makes functions with: fn name() { }";
+    if(name==="return") return " — winlang hands a value back with: give";
+    if(name==="continue") return " — winlang skips a turn of a loop with: skip";
+    if(name==="elif") return " — winlang spells it: else if";
+    if(name==="input") return " — winlang asks with: ask(\"question\")";
+    if(name==="print_ln"||name==="echo"||name==="log") return " — winlang says it with: say";
+    return "";
+  };
+  return g;
+}
+
+/* ---------------- 7a. THE RUNNER ---------------- */
+/* o = {host, src, draws, appId, cwd, setTitle, onDone} */
+function wlLaunch(o){
+  o=o||{};
+  const host=o.host;
+  host.innerHTML="";
+  host.classList.add("wl-stagehost");
+  const stage=makePyStage(host,{appId:o.appId,setTitle:o.setTitle});
+  const R={
+    io:{write:stage.write,error:stage.error},
+    stage, draws:o.draws||new Map(), depth:0,
+    start:performance.now(),
+    cwd:o.cwd||[...HOME_PATH,"Documents"],
+    hint:()=>"",
+    needCanvas:()=>stage.ctx,
+  };
+  let stopped=false, sendVal;
+  const done=(ok)=>{
+    if(stopped) return;
+    stopped=true;
+    try{ stage.quit(); }catch(e){}
+    if(o.onDone) o.onDone(ok);
+  };
+  const fail=(e)=>{
+    if(e&&e.__wlerr) stage.error((e.line?"line "+e.line+" — ":"")+e.kind+": "+e.msg);
+    else if(e&&e.__wlctl==="give") stage.error("give only works inside a function");
+    else if(e===WL_BREAK) stage.error("break only works inside a loop");
+    else if(e===WL_SKIP)  stage.error("skip only works inside a loop");
+    else stage.error("WinLang hit a problem it wasn't ready for: "+(e&&e.message?e.message:String(e)));
+    done(false);
+  };
+
+  let prog;
+  try{ prog=wlParse(o.src); }
+  catch(e){ fail(e); return {stop:done, stage}; }
+  const gen=wlBlock(prog,wlGlobals(R),R);
+
+  /* Run in ~14ms slices and hand the frame back. That's what keeps the window
+     repainting mid-program, keeps Stop responsive, and means a runaway loop
+     costs you a click instead of the whole tab. */
+  function step(){
+    if(stopped) return;
+    if(!stage.alive()){ done(false); return; }
+    const t0=performance.now();
+    try{
+      for(;;){
+        const r=gen.next(sendVal);
+        sendVal=undefined;
+        if(r.done){ done(true); return; }
+        const y=r.value;
+        if(y&&y.pause==="wait"){
+          if(y.ms<=0) requestAnimationFrame(step); else setTimeout(step,y.ms);
+          return;
+        }
+        if(y&&y.pause==="ask"){
+          stage.readLine(y.prompt,(v)=>{ sendVal=v; step(); });
+          return;
+        }
+        if(performance.now()-t0>14){ setTimeout(step,0); return; }
+      }
+    }catch(e){ fail(e); }
+  }
+  step();
+  return {stop:()=>done(false), stage};
+}
+
+/* ---------------- 7b. SYNTAX HIGHLIGHTING + THE DRAWING CHIPS ---------------- */
+/* draw / draw#7 has to be matched before the comment rule, or the # in draw#7
+   swallows the rest of the line. */
+const WL_HL_RE=/(draw#\d+|draw\b)|(#[^\n]*)|("(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?)|\b(let|if|else|while|repeat|for|in|fn|give|break|skip|say|show|and|or|not|true|false|nothing)\b|\b(wl|sys)\b|\b(\d+(?:\.\d+)?)\b/g;
+const WL_TOK_RE=/draw#\d+|draw\b/g;
+
+function wlHighlight(src,draws){
+  return String(src==null?"":src).replace(WL_HL_RE,(m,dr,com,str,kw,ns,num)=>{
+    if(dr!==undefined){
+      const id=dr.length>4?+dr.slice(5):null;
+      const d=id!=null&&draws?draws.get(id):null;
+      const w=' style="width:'+dr.length+'ch"';
+      if(id==null)  return '<span class="wl-chip empty"'+w+' title="Click to draw"><i></i></span>';
+      if(!d)        return '<span class="wl-chip gone"'+w+' title="drawing #'+id+' is missing"><i></i></span>';
+      if(wlDrawingEmpty(d)) return '<span class="wl-chip empty"'+w+' title="Click to draw"><i></i></span>';
+      return '<span class="wl-chip"'+w+' title="Click to edit drawing #'+id+'"><i style="background-image:url('+wlThumbURL(d)+')"></i></span>';
+    }
+    if(com!==undefined) return '<span class="wl-c">'+esc(com)+'</span>';
+    if(str!==undefined) return '<span class="wl-s">'+esc(str)+'</span>';
+    if(kw !==undefined) return '<span class="wl-k">'+esc(kw)+'</span>';
+    if(ns !==undefined) return '<span class="wl-n">'+esc(ns)+'</span>';
+    return '<span class="wl-d">'+esc(num)+'</span>';
+  });
+}
+/* the draw literal, if any, sitting under a caret position */
+function wlTokenAt(src,pos){
+  WL_TOK_RE.lastIndex=0;
+  let m;
+  while((m=WL_TOK_RE.exec(src))){
+    const a=m.index, b=a+m[0].length;
+    if(pos>a&&pos<b) return {start:a,end:b,text:m[0]};
+  }
+  return null;
+}
+function wlUsedIds(src){
+  const used=new Set();
+  WL_TOK_RE.lastIndex=0;
+  let m;
+  while((m=WL_TOK_RE.exec(src))) if(m[0].length>4) used.add(+m[0].slice(5));
+  return used;
+}
+
+/* ---------------- 7c. READY-MADE LINES ---------------- */
+/* The Insert menu. Nobody should have to remember syntax to get started — pick
+   the thing you want and a working version of it lands at the cursor. Several
+   of these drop a bare `draw`, so the next thing you do is click the box. */
+const WL_SNIPPETS=[
+  {icon:"🖌️", label:"show a drawing",        code:'show draw\n'},
+  {icon:"💬", label:"say something",         code:'say "hello"\n'},
+  {icon:"❓", label:"ask a question",         code:'let name = ask("what is your name? ")\nsay "hi " + name\n'},
+  {icon:"🔢", label:"ask for a number",      code:'let n = ask_number("pick a number: ")\nsay n * 2\n'},
+  {icon:"🔁", label:"do it a few times",     code:'repeat 5 {\n  say "again"\n}\n'},
+  {icon:"⬆️", label:"count up",              code:'for i in 0..10 {\n  say i\n}\n'},
+  {icon:"🔀", label:"if / else",             code:'if 2 > 1 {\n  say "yes"\n} else {\n  say "no"\n}\n'},
+  {icon:"🧩", label:"make a function",       code:'fn add(a, b) {\n  give a + b\n}\n\nsay add(2, 3)\n'},
+  {icon:"🎞️", label:"animate a drawing",     code:'canvas(400, 300)\nlet x = 0\n\nwhile true {\n  x = x + 2\n  if x > 400 { x = 0 }\n  wipe()\n  show draw, x, 110, 0.5\n  wait(0)\n}\n'},
+  {icon:"🎲", label:"pick something random", code:'let things = ["yes", "no", "maybe"]\nsay pick(things)\n'},
+  {icon:"🌀", label:"a screen effect",       code:'effect("shake")\nwait(2)\nno_effects()\n'},
+  {icon:"🔔", label:"send a notification",   code:'notify("WinLang", "something happened")\n'},
+  {icon:"🖼️", label:"save a drawing as a picture", code:'save_drawing(draw, "Pictures/my-art.png")\nsay "look in Pictures"\n'},
+  {icon:"📄", label:"write a text file",     code:'write("Documents/hello.txt", "written by winlang")\nsay read("Documents/hello.txt")\n'},
+];
+
+/* ---------------- 7d. THE IDE ---------------- */
+let WL_PENDING=null;
+const WLIDE={loader:null};
+function openWinlangWith(pn){
+  if(state.wins.winlang&&WLIDE.loader){
+    if(state.wins.winlang.min) toggleMin("winlang",false);
+    focusWin("winlang"); WLIDE.loader(pn);
+  } else { WL_PENDING=pn; openApp("winlang"); }
+}
+function buildWinlang(body,win){
+  body.innerHTML=`<div class="pyide wlide">
+    <div class="py-bar">
+      <button class="py-btn" data-a="new">New</button>
+      <button class="py-btn" data-a="open">Open…</button>
+      <button class="py-btn" data-a="save">Save</button>
+      <span class="py-sep"></span>
+      <button class="py-btn art" data-a="insert" title="Put a drawing into your code">🖌️ Drawing</button>
+      <button class="py-btn" data-a="snips" title="Drop a ready-made line in">＋ Insert ▾</button>
+      <span class="py-sep"></span>
+      <button class="py-btn go" data-a="run">▶ Run</button>
+      <button class="py-btn stop" data-a="stop">■ Stop</button>
+      <span class="py-sep"></span>
+      <button class="py-btn" data-a="samples">Examples ▾</button>
+      <button class="py-btn" data-a="help">Help</button>
+      <span class="py-status"></span>
+    </div>
+    <div class="py-editwrap">
+      <div class="py-gutter"></div>
+      <div class="wl-codewrap">
+        <pre class="wl-hl" aria-hidden="true"></pre>
+        <textarea class="wl-code" spellcheck="false" wrap="off" placeholder="# winlang — say &quot;hello&quot;"></textarea>
+      </div>
+    </div>
+    <div class="py-split" title="Drag to resize"></div>
+    <div class="py-out"></div>
+  </div>`;
+  const ta=body.querySelector(".wl-code");
+  const hl=body.querySelector(".wl-hl");
+  const gutter=body.querySelector(".py-gutter");
+  const out=body.querySelector(".py-out");
+  const status=body.querySelector(".py-status");
+  const btnStop=body.querySelector('[data-a="stop"]');
+  const editwrap=body.querySelector(".py-editwrap");
+  let cur=null, live=null, draws=new Map();
+
+  const setTitle=()=>{ const t=win.querySelector(".tt"); if(t) t.textContent=(cur?cur.name:"Untitled")+" — WinLang"; };
+  const setStatus=(t,cls)=>{ status.textContent=t||""; status.className="py-status"+(cls?" "+cls:""); };
+  const reflect=()=>{ btnStop.disabled=!live; };
+
+  function paint(){
+    hl.innerHTML=wlHighlight(ta.value,draws)+"\n";
+    const n=ta.value.split("\n").length;
+    let s=""; for(let i=1;i<=n;i++) s+=i+"\n";
+    gutter.textContent=s;
+    sync();
+  }
+  function sync(){ hl.scrollTop=ta.scrollTop; hl.scrollLeft=ta.scrollLeft; gutter.scrollTop=ta.scrollTop; }
+  ta.addEventListener("input",paint);
+  ta.addEventListener("scroll",sync);
+
+  /* clicking a drawing: the textarea is on top of the highlight layer, so the
+     click never reaches the chip. It doesn't need to — the browser has already
+     put the caret where the user aimed, so we just look at what's under it. */
+  ta.addEventListener("click",()=>{
+    const tok=wlTokenAt(ta.value,ta.selectionStart);
+    if(tok&&ta.selectionStart===ta.selectionEnd) editDrawing(tok);
+  });
+
+  function editDrawing(tok){
+    let id=tok.text.length>4?+tok.text.slice(5):null;
+    wlDrawPad({
+      label:id!=null?"Drawing #"+id:"New drawing",
+      drawing:id!=null?draws.get(id):null,
+      onDone:(d)=>{
+        if(id==null||!draws.has(id)){
+          id=wlNextDrawId(draws);
+          const rep="draw#"+id;
+          ta.value=ta.value.slice(0,tok.start)+rep+ta.value.slice(tok.end);
+          ta.selectionStart=ta.selectionEnd=tok.start+rep.length;
+        }
+        draws.set(id,d);
+        paint();
+        setStatus("drawing #"+id+" saved","ok");
+        try{ ta.focus(); }catch(e){}
+      }
+    });
+  }
+  /* drop a snippet in at the cursor, lined up with the indentation it lands in */
+  function insertSnippet(code){
+    const s=ta.selectionStart, e=ta.selectionEnd;
+    const ls=ta.value.lastIndexOf("\n",s-1)+1;
+    const before=ta.value.slice(ls,s);
+    const indent=(/^[ \t]*/.exec(before)||[""])[0];
+    let text=code.replace(/\n(?!$)/g,"\n"+indent);
+    if(before.trim()) text="\n"+indent+text;          // don't land in the middle of a line
+    ta.value=ta.value.slice(0,s)+text+ta.value.slice(e);
+    ta.selectionStart=ta.selectionEnd=s+text.length;
+    paint();
+    setStatus("");
+    try{ ta.focus(); }catch(_){}
+  }
+  function insertDrawing(){
+    const s=ta.selectionStart, e=ta.selectionEnd;
+    wlDrawPad({
+      label:"New drawing",
+      onDone:(d)=>{
+        const id=wlNextDrawId(draws);
+        draws.set(id,d);
+        const tok="draw#"+id;
+        ta.value=ta.value.slice(0,s)+tok+ta.value.slice(e);
+        ta.selectionStart=ta.selectionEnd=s+tok.length;
+        paint();
+        setStatus("drawing #"+id+" added — put it in wl.display()","ok");
+        try{ ta.focus(); }catch(e2){}
+      }
+    });
+  }
+
+  ta.addEventListener("keydown",e=>{
+    if(e.key==="F5"){ e.preventDefault(); run(); return; }
+    if(e.key==="Tab"){
+      e.preventDefault();
+      const s=ta.selectionStart;
+      ta.value=ta.value.slice(0,s)+"  "+ta.value.slice(ta.selectionEnd);
+      ta.selectionStart=ta.selectionEnd=s+2;
+      paint(); return;
+    }
+    if(e.key==="Enter"){
+      const s=ta.selectionStart;
+      const ls=ta.value.lastIndexOf("\n",s-1)+1;
+      const lineText=ta.value.slice(ls,s);
+      const indent=(/^[ \t]*/.exec(lineText)||[""])[0];
+      const extra=/\{\s*$/.test(lineText)?"  ":"";
+      /* typing Enter right before a } puts the closing brace on its own line,
+         lined up with the block that opened it */
+      const closing=/^\s*\}/.test(ta.value.slice(ta.selectionEnd));
+      if(indent||extra){
+        e.preventDefault();
+        const ins="\n"+indent+extra+(extra&&closing?"\n"+indent:"");
+        ta.value=ta.value.slice(0,s)+ins+ta.value.slice(ta.selectionEnd);
+        ta.selectionStart=ta.selectionEnd=s+1+indent.length+extra.length;
+        paint();
+      }
+      return;
+    }
+    if(e.key==="}"){                       // pull a lone } back one level
+      const s=ta.selectionStart;
+      const ls=ta.value.lastIndexOf("\n",s-1)+1;
+      const before=ta.value.slice(ls,s);
+      if(/^[ \t]+$/.test(before)&&before.length>=2){
+        e.preventDefault();
+        ta.value=ta.value.slice(0,s-2)+"}"+ta.value.slice(ta.selectionEnd);
+        ta.selectionStart=ta.selectionEnd=s-1;
+        paint();
+      }
+    }
+  });
+
+  function load(pn){
+    const parent=nodeAt(pn.path), f=parent&&parent.children&&parent.children[pn.name];
+    if(!f){ winDialog({icon:"❌",title:"WinLang",msg:"That file couldn't be found."}); return; }
+    const split=wlSplitFile(String(f.content==null?"":f.content));
+    ta.value=split.src; draws=split.draws;
+    cur={path:[...pn.path],name:pn.name};
+    setTitle(); paint(); setStatus("");
+  }
+  WLIDE.loader=load;
+
+  function doSave(path,name){
+    if(!/\.wl$/i.test(name)) name+=".wl";
+    const parent=nodeAt(path);
+    if(!parent||!parent.children) return;
+    const ex=parent.children[name];
+    if(ex&&ex.folder){ winDialog({icon:"❌",title:"WinLang",msg:"A folder with that name already exists."}); return; }
+    /* drop drawings whose box has been deleted from the code, so a file that
+       has been edited for a month doesn't quietly carry a museum around */
+    const used=wlUsedIds(ta.value);
+    [...draws.keys()].forEach(id=>{ if(!used.has(id)) draws.delete(id); });
+    parent.children[name]=Object.assign(ex||{icon:"🪄"},{content:wlJoinFile(ta.value,draws)});
+    cur={path:[...path],name};
+    setTitle(); saveFS(); refreshFX(); paint();
+    setStatus("saved","ok");
+    setTimeout(()=>{ if(status.textContent==="saved") setStatus(""); },1500);
+  }
+
+  function stop(){ if(live){ try{ live.stop(); }catch(e){} } live=null; reflect(); }
+  function run(){
+    stop();
+    setStatus("running…","run");
+    live=wlLaunch({
+      host:out, src:ta.value, draws,
+      appId:"winlang",
+      cwd:cur?cur.path:[...HOME_PATH,"Documents"],
+      setTitle:(t)=>{ const e=win.querySelector(".tt"); if(e) e.textContent=t+" — WinLang"; },
+      onDone:(ok)=>{ live=null; reflect(); setStatus(ok?"finished":"stopped — see the message above",ok?"ok":"bad"); },
+    });
+    reflect();
+  }
+
+  body.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.a;
+    if(a==="new"){ stop(); ta.value=""; draws=new Map(); cur=null; setTitle(); paint(); out.innerHTML=""; setStatus(""); }
+    else if(a==="open") fileDialog({mode:"open",cb:(p,n)=>load({path:p,name:n})});
+    else if(a==="save"){ if(cur) doSave(cur.path,cur.name); else fileDialog({mode:"save",cb:doSave}); }
+    else if(a==="insert") insertDrawing();
+    else if(a==="snips"){
+      const r=b.getBoundingClientRect();
+      showCtx(r.left,r.bottom,WL_SNIPPETS.map(s=>({
+        icon:s.icon, label:s.label, action:()=>insertSnippet(s.code)
+      })));
+    }
+    else if(a==="run") run();
+    else if(a==="stop"){ stop(); setStatus("stopped"); }
+    else if(a==="help") wlHelpDialog();
+    else if(a==="samples"){
+      const r=b.getBoundingClientRect();
+      const S=wlSamples();
+      showCtx(r.left,r.bottom,Object.keys(S).map(nm=>({
+        icon:"🪄", label:nm,
+        action:()=>{
+          stop();
+          const sp=wlSplitFile(S[nm]);
+          ta.value=sp.src; draws=sp.draws; cur=null;
+          setTitle(); paint(); out.innerHTML=""; setStatus("loaded "+nm);
+        }
+      })));
+    }
+  });
+
+  const split=body.querySelector(".py-split");
+  split.addEventListener("mousedown",e=>{
+    e.preventDefault();
+    const startY=e.clientY, startH=editwrap.offsetHeight;
+    const mv=ev=>{
+      const h=Math.max(80,Math.min(body.offsetHeight-120,startH+(ev.clientY-startY)));
+      editwrap.style.flex="0 0 "+h+"px";
+    };
+    const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
+    document.addEventListener("mousemove",mv);
+    document.addEventListener("mouseup",up);
+  });
+
+  if(WL_PENDING){ load(WL_PENDING); WL_PENDING=null; }
+  else {
+    const sp=wlSplitFile(wlSamples()["hello.wl"]);
+    ta.value=sp.src; draws=sp.draws; setTitle();
+  }
+  paint(); reflect();
+}
+
+/* ---------------- 7e. THE .wl FILE RUNNER ---------------- */
+let WLRUN_PENDING=null;
+function openWlFile(pn){
+  WLRUN_PENDING=pn;
+  const key=openApp("wlrun",{instance:true,title:pn.name+" — WinLang"});
+  WLRUN_PENDING=null;
+  return key;
+}
+function buildWlRun(body,win,rec){
+  body.innerHTML=`<div class="pyide pyrunner wlide">
+    <div class="py-bar">
+      <button class="py-btn go" data-a="again">⟳ Run again</button>
+      <button class="py-btn stop" data-a="stop">■ Stop</button>
+      <button class="py-btn" data-a="edit">🖌️ Edit</button>
+      <span class="py-status"></span>
+    </div>
+    <div class="py-out"></div>
+  </div>`;
+  const out=body.querySelector(".py-out");
+  const status=body.querySelector(".py-status");
+  let cur=null, live=null;
+  const setStatus=(t,cls)=>{ status.textContent=t||""; status.className="py-status"+(cls?" "+cls:""); };
+
+  function stop(){ if(live){ try{ live.stop(); }catch(e){} } live=null; }
+  function start(){
+    if(!cur) return;
+    const parent=nodeAt(cur.path), f=parent&&parent.children&&parent.children[cur.name];
+    if(!f){ out.innerHTML=""; setStatus("file not found","bad"); return; }
+    if(f.web){
+      out.innerHTML=""; setStatus("blocked","bad");
+      winDialog({icon:"🚫",title:cur.name,msg:"<b>"+esc(cur.name)+"</b> came from the internet.<br>WinClone won't run downloaded programs."});
+      return;
+    }
+    stop();
+    setStatus("running…","run");
+    logEvent("info","WinLang","Program started — "+cur.name);
+    const sp=wlSplitFile(String(f.content==null?"":f.content));
+    live=wlLaunch({
+      host:out, src:sp.src, draws:sp.draws,
+      appId:(rec&&rec.key)||"wlrun",
+      cwd:[...cur.path],
+      setTitle:(x)=>{ const e=win.querySelector(".tt"); if(e) e.textContent=x+" — WinLang"; },
+      onDone:(ok)=>{ live=null; setStatus(ok?"finished":"stopped — see the message above",ok?"ok":"bad");
+        logEvent(ok?"info":"warning","WinLang",(ok?"Program finished — ":"Program stopped — ")+cur.name); },
+    });
+  }
+  function load(pn){ cur={path:[...pn.path],name:pn.name}; start(); }
+
+  body.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.a;
+    if(a==="again") start();
+    else if(a==="stop"){ stop(); setStatus("stopped"); }
+    else if(a==="edit"){ if(cur) openWinlangWith({path:cur.path,name:cur.name}); }
+  });
+
+  if(WLRUN_PENDING){ load(WLRUN_PENDING); WLRUN_PENDING=null; }
+  else setStatus("open a .wl file from File Explorer");
+}
+
+function wlHelpDialog(){
+  winDialog({icon:"🪄",title:"WinLang",msg:
+    `<div style="line-height:1.6;font-size:12.5px;max-height:66vh;overflow:auto;padding-right:4px">
+    <b>The whole thing in two lines</b><br>
+    <code>say "hello"</code> writes to the console down there.
+    <code>show draw</code> puts a picture on the canvas — and typing
+    <code>draw</code> is what makes the little box appear. Click it, sketch
+    something on a transparent pad, and it becomes <code>draw#1</code>. Click it
+    again any time to keep drawing on it.<br>
+    Can't remember something? Hit <b>＋ Insert</b> and pick it off the menu.<br><br>
+
+    <b>No prefixes needed</b><br>
+    Every tool works on its own: <code>random(1, 6)</code>, <code>wait(2)</code>,
+    <code>notify("hi")</code>. Writing <code>wl.random(1, 6)</code> or
+    <code>sys.notify("hi")</code> does exactly the same thing — the prefixes are
+    only there to say which family something belongs to.<br><br>
+
+    <b>The language</b><br>
+    <code>let x = 5</code> makes a variable, and <code>x = 6</code> changes it.<br>
+    <code>if x &gt; 3 { … } else { … }</code> · <code>while x &gt; 0 { … }</code> ·
+    <code>repeat 10 { … }</code> · <code>for i in 0..10 { … }</code><br>
+    <code>fn add(a, b) { give a + b }</code> — <code>give</code> hands a value back.<br>
+    <code>break</code> leaves a loop, <code>skip</code> jumps to its next turn.<br>
+    Lists are <code>[1, 2, 3]</code>, maps are <code>{name: "Atlas"}</code>, and
+    <code># </code>starts a comment.<br><br>
+
+    <b>The tools (wl)</b><br>
+    <code>show</code> / <code>display</code> <code>say</code> <code>ask</code>
+    <code>ask_number</code> <code>clear</code> <code>wait</code>
+    <code>canvas</code> <code>bg</code> <code>wipe</code> <code>key</code> <code>mouse</code>
+    <code>tint</code> <code>flip</code> <code>thicker</code> <code>len</code> <code>text</code>
+    <code>number</code> <code>type</code> <code>round</code> <code>floor</code> <code>ceil</code>
+    <code>abs</code> <code>sqrt</code> <code>pow</code> <code>min</code> <code>max</code>
+    <code>random</code> <code>pick</code> <code>upper</code> <code>lower</code> <code>trim</code>
+    <code>split</code> <code>join</code> <code>contains</code> <code>replace</code>
+    <code>range</code> <code>push</code> <code>pop</code> <code>remove</code> <code>sort</code>
+    <code>reverse</code> <code>keys</code> <code>has</code> <code>time</code> <code>beep</code><br><br>
+
+    <b>The rest of WinClone (sys)</b><br>
+    <code>notify(title, body)</code> · <code>read(path)</code> ·
+    <code>write(path, text)</code> · <code>ls(path)</code> ·
+    <code>exists(path)</code> · <code>delete(path)</code> — to the Recycle Bin, like
+    Explorer does · <code>open(app or file)</code> · <code>apps()</code> ·
+    <code>user()</code> · <code>set_user("Atlas")</code> · <code>version()</code> ·
+    <code>now()</code> · <code>save_drawing(d, "Pictures/art.png")</code>, which turns
+    a drawing into a real picture file you can open in Photos or set as your
+    wallpaper.<br>
+    <b>Paths are easy:</b> forward slashes work, and anything starting with
+    Pictures, Documents, Desktop, Downloads, Music or Videos is taken from your
+    own folders wherever the program lives.<br><br>
+
+    <b>Screen effects</b><br>
+    <code>effect("shake")</code> turns one on and <code>effect("shake", false)</code>
+    turns it off. <code>effects()</code> lists all of them,
+    <code>no_effects()</code> stops the lot, <code>chaos()</code> runs everything
+    at once, and <code>effect_power(1.6)</code> sets how hard they hit.
+    These take over the whole screen, not just this window.<br><br>
+
+    <b>Placing things</b><br>
+    <code>show d</code> centres it and scales it to fit.
+    <code>show d, x, y</code> puts its top-left corner at x,y.
+    <code>show d, x, y, 2</code> does the same at double size.<br><br>
+
+    <b>Files</b><br>
+    Programs save as <b>.wl</b>. The drawings ride along inside the same file as
+    comment lines at the bottom, so one file is the whole thing — code and art.
+    Double-click a .wl in File Explorer to run it, or right-click ‣ Edit in WinLang.<br><br>
+
+    <b>Keys</b> — F5 runs. Tab indents. In the drawing pad, Ctrl+Z undoes,
+    Esc cancels, Ctrl+Enter is Done.
+    </div>`,
+    buttons:[{label:"Got it",primary:true}]});
+}
+
+/* ---------------- 7f. EXAMPLES ---------------- */
+/* The strokes for the smiley are generated rather than typed out as a wall of
+   coordinates — it still arrives as an ordinary drawing you can open and edit. */
+function wlArcStroke(cx,cy,r,a0,a1,c,w,steps){
+  const p=[]; steps=steps||26;
+  for(let i=0;i<=steps;i++){
+    const a=a0+(a1-a0)*i/steps;
+    p.push(Math.round((cx+Math.cos(a)*r)*10)/10,Math.round((cy+Math.sin(a)*r)*10)/10);
+  }
+  return {c,w,e:0,p};
+}
+let WL_SAMPLES_CACHE=null;
+function wlSamples(){
+  if(WL_SAMPLES_CACHE) return WL_SAMPLES_CACHE;
+  const TAU=Math.PI*2;
+  const smiley={__wl:"draw",w:WL_DRAW_SIZE,h:WL_DRAW_SIZE,st:[
+    wlArcStroke(80,80,58,0,TAU,"#ffd93d",7,40),
+    wlArcStroke(60,64,5,0,TAU,"#ffffff",6,12),
+    wlArcStroke(100,64,5,0,TAU,"#ffffff",6,12),
+    wlArcStroke(80,88,30,0.30*Math.PI,0.70*Math.PI,"#ffffff",7,18),
+  ]};
+  const star={__wl:"draw",w:WL_DRAW_SIZE,h:WL_DRAW_SIZE,st:[(()=>{
+    const p=[];
+    for(let i=0;i<=10;i++){
+      const a=-Math.PI/2+i*Math.PI/5, r=i%2?26:60;
+      p.push(Math.round((80+Math.cos(a)*r)*10)/10,Math.round((80+Math.sin(a)*r)*10)/10);
+    }
+    return {c:"#4cc2ff",w:6,e:0,p};
+  })()]};
+
+  const S={};
+  S["hello.wl"]=wlJoinFile(
+`# WinLang — Atlas's language.
+# The thing no other language does: that box down there is a picture,
+# and it lives inside this file. Click it and draw on it.
+
+say "hello from winlang"
+
+show draw#1
+
+say "that drawing came out of your source code"`,new Map([[1,smiley]]));
+
+  S["draw-your-own.wl"]=
+`# Type the word  draw  anywhere and a box appears. Click it.
+# Once you've drawn something it turns into draw#1, draw#2 and so on.
+
+# click this box:
+show draw
+
+say "click the box above, sketch something, then press Run"`;
+
+  S["many.wl"]=wlJoinFile(
+`# One drawing, used over and over. Nothing is copied — tint() hands back
+# a new drawing based on the old one.
+
+canvas(460, 320)
+bg("#101820")
+
+let colours = ["#ff4d4d", "#ffd93d", "#4ade80", "#4cc2ff", "#ff7ac8"]
+
+for i in 0..5 {
+  show tint(draw#1, colours[i]), 10 + i * 88, 40, 0.55
+}
+
+show draw#1, 150, 150, 1
+say "same drawing, six times, five colours"`,new Map([[1,star]]));
+
+  S["bounce.wl"]=wlJoinFile(
+`# A drawing with physics. wait(0) waits for the next frame, which is
+# what turns a while loop into an animation.
+
+canvas(460, 320)
+
+let x = 40
+let y = 30
+let dx = 3.4
+let dy = 0
+
+while true {
+  dy = dy + 0.35
+  x = x + dx
+  y = y + dy
+
+  if y > 250 {
+    y = 250
+    dy = 0 - dy * 0.82
+    beep(220, 0.05)
+  }
+  if x > 380 or x < 0 { dx = 0 - dx }
+
+  wipe()
+  bg("#0d1117")
+  show draw#1, x, y, 0.5
+  wait(0)
+}`,new Map([[1,smiley]]));
+
+  S["ask-me.wl"]=
+`# ask() stops and waits for you to type something in the box below.
+
+let name = ask("what's your name? ")
+say "hi " + name
+
+let n = ask_number("pick a number: ")
+repeat n {
+  say "*" * 20
+}
+
+notify("WinLang", name + " ran a program")`;
+
+  S["to-picture.wl"]=wlJoinFile(
+`# A drawing you made in the editor, saved out as a real .png file.
+# Open Photos afterwards — it's there, and you can set it as your wallpaper.
+
+let art = thicker(draw#1, 3)
+
+show art
+
+let where = save_drawing(art, "Pictures/winlang-art.png")
+say "saved to " + where
+notify("WinLang", "your drawing is in Pictures now")`,new Map([[1,star]]));
+
+  S["effects.wl"]=
+`# These ones escape the window and happen to the whole screen.
+# Everything underneath carries on working — badly.
+
+say "hold on to something"
+wait(1)
+
+for name in ["shake", "spin", "invert"] {
+  say name
+  effect(name)
+  wait(2)
+  no_effects()
+  wait(0.5)
+}
+
+say ""
+say "all of them:"
+for e in effects() { say "  " + e }`;
+
+  S["files.wl"]=
+`# winlang can reach the rest of WinClone. No sys. needed, and forward
+# slashes are fine — "Pictures/art.png" means your Pictures folder.
+
+say "you are " + user() + ", on WinClone " + version()
+say "the time is " + now()
+say ""
+
+let here = ls("Documents")
+say "Documents holds " + len(here) + " things:"
+for f in here { say "  " + f }
+
+write("Documents/from-winlang.txt", "winlang wrote this")
+say ""
+say "wrote from-winlang.txt — open Documents and look"`;
+
+  WL_SAMPLES_CACHE=S;
+  return S;
+}
+
 /* ============================ VIRTUAL FILESYSTEM (persistent) ============================ */
 const FS_KEY="wc_fs", RC_KEY="wc_recycle", INF_KEY="wc_infect";
 function defaultFS(){ return {
@@ -7951,6 +9916,21 @@ try{
       saveFS();
     }
     localStorage.setItem("wc_pysamples4","1");
+  }
+}catch(e){}
+/* the same one-time drop for WinLang — Documents\WinLang with the examples in it */
+try{
+  if(!localStorage.getItem("wc_wlsamples1")){
+    const _docs=nodeAt([...HOME_PATH,"Documents"]);
+    if(_docs&&_docs.children){
+      if(!_docs.children["WinLang"]) _docs.children["WinLang"]={folder:true,children:{}};
+      const _wf=_docs.children["WinLang"], _s=wlSamples();
+      if(_wf.children) Object.keys(_s).forEach(k=>{
+        if(!_wf.children[k]) _wf.children[k]={icon:"🪄",content:_s[k]};
+      });
+      saveFS();
+    }
+    localStorage.setItem("wc_wlsamples1","1");
   }
 }catch(e){}
 
@@ -8040,6 +10020,7 @@ const NEW_TYPES=[
   {label:"Log File",            icon:"📄", base:"New Log File.log",           make:()=>({icon:"📄",content:""})},
   {label:"Batch Script",        icon:"📜", base:"New Batch Script.bat",       make:()=>({icon:"📜",content:"@echo off\n"})},
   {label:"Python Script",       icon:"🐍", base:"New Python Script.py",       make:()=>({icon:"🐍",content:"# A new Python script.\n# Double-click to run it, or right-click ‣ Edit to open it in Python.\n\nprint(\"hello from Python\")\n"})},
+  {label:"WinLang Program",     icon:"🪄", base:"New WinLang Program.wl",    make:()=>({icon:"🪄",content:"# A new WinLang program.\n# Type  draw  anywhere and click the box that appears.\n\nsay \"hello from winlang\"\n\nshow draw\n"})},
   {label:"Bitmap Image",        icon:"🖼️", base:"New Bitmap Image.bmp",       make:()=>({icon:"🖼️"})},
   {label:"ZIP Archive",         icon:"🗜️", base:"New Archive.zip",            make:()=>({icon:"🗜️",archive:true,children:{}})},
   {label:"RAR Archive",         icon:"🗜️", base:"New Archive.rar",            make:()=>({icon:"🗜️",archive:true,children:{}})},
@@ -8220,6 +10201,7 @@ function fsOpen(path,name,item){
   else if(/\.(wcdocs?|docx?|odt|rtf)$/.test(lo)) openDocs({path:[...path],name});
   else if(/\.(bat|cmd)$/.test(lo)) openBatch({path:[...path],name});
   else if(/\.py$/.test(lo)) openPyFile({path:[...path],name});
+  else if(/\.wl$/.test(lo)) openWlFile({path:[...path],name});
   else if(item.exe||item.malware||lo.endsWith(".exe")) runFile(name,item);
   else openFileInNotepad({path:[...path],name}); // txt, md, json, log, rtf, csv, ini, bat, unknown-with-content
 }
@@ -8230,6 +10212,8 @@ function fsItemMenu(x,y,path,name,item,extra){
     items.push({icon:"📝",label:"Edit",action:()=>openFileInNotepad({path:[...path],name})});
   if(/\.py$/i.test(name) && !item.web)
     items.push({icon:"🐍",label:"Edit in Python",action:()=>openPythonWith({path:[...path],name})});
+  if(/\.wl$/i.test(name) && !item.web)
+    items.push({icon:"🪄",label:"Edit in WinLang",action:()=>openWinlangWith({path:[...path],name})});
   if(!item.sys) items.push({icon:"📤",label:"Export (save to computer)…",action:()=>exportFile(path,name,item)});
   if(/\.(png|jpe?g|gif|bmp)$/i.test(name) && !item.locked)
     items.push({icon:"🖼️",label:"Set as wallpaper",action:()=>setWallpaper(artFor(name,item).g)});

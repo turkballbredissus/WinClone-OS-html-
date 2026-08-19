@@ -1431,3 +1431,85 @@
   .tk-new-form input:focus,.tk-new-form select:focus{border-color:var(--accent-solid)}
   .tkf-err{color:#ff8a8a;font-size:12px;margin-top:6px}
   .tkf-err:empty{display:none}
+
+  /* ---------- WINLANG ---------- */
+  /* The editor is a transparent textarea sitting exactly on top of a <pre> that
+     holds the highlighted copy. Both have to agree on font, padding and
+     line-height to the pixel, or the caret drifts away from the letters — and
+     the drawing chips, which are sized in ch units to cover their own token,
+     drift with it. */
+  .wl-codewrap{flex:1;position:relative;min-width:0;overflow:hidden;background:#1e1e1e}
+  .wl-hl,.wl-code{position:absolute;top:0;left:0;right:0;bottom:0;margin:0;padding:8px 10px;
+    border:0;font:12.5px/1.5 Consolas,"Courier New",monospace;white-space:pre;
+    tab-size:2;letter-spacing:normal;word-spacing:normal}
+  .wl-hl{overflow:hidden;color:#dcdcdc;pointer-events:none;background:transparent}
+  .wl-code{overflow:auto;resize:none;outline:0;background:transparent;color:transparent;
+    caret-color:#fff;-webkit-text-fill-color:transparent}
+  .wl-code::selection{background:rgba(76,194,255,.32)}
+  .wl-code::placeholder{color:#5a5a5a;-webkit-text-fill-color:#5a5a5a}
+  .wl-k{color:#c586c0}
+  .wl-n{color:#4fc1ff}
+  .wl-s{color:#ce9178}
+  .wl-c{color:#6a9955}
+  .wl-d{color:#b5cea8}
+
+  /* a picture, inline, in the middle of a line of code */
+  .wl-chip{display:inline-block;height:1em;vertical-align:text-bottom;position:relative}
+  .wl-chip i{position:absolute;left:1px;right:1px;top:-5px;bottom:-5px;border-radius:3px;
+    border:1px solid rgba(255,122,200,.6);background-color:rgba(255,255,255,.05);
+    background-size:contain;background-repeat:no-repeat;background-position:center;
+    box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+  .wl-chip.empty i{border-style:dashed;border-color:rgba(255,122,200,.85);
+    background-color:rgba(255,122,200,.12)}
+  .wl-chip.gone i{border-color:#ff7b72;background-color:rgba(255,123,114,.14)}
+  .py-btn.art{background:#5a2ea6;border-color:#7a45d0}
+  .py-btn.art:hover{background:#6b38c4}
+
+  /* the run canvas is see-through, so it gets a checkerboard behind it — a
+     drawing with nothing under it should look like it's floating, not like
+     it's on a black rectangle */
+  .wl-stagehost .py-canvas{background-color:#0f0f0f;
+    background-image:linear-gradient(45deg,#191919 25%,transparent 25%),
+      linear-gradient(-45deg,#191919 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#191919 75%),
+      linear-gradient(-45deg,transparent 75%,#191919 75%);
+    background-size:16px 16px;
+    background-position:0 0,0 8px,8px -8px,-8px 0}
+
+  /* ---------- WINLANG: THE DRAWING PAD ---------- */
+  .wl-padback{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55)}
+  .wl-pad{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:580px;max-width:95vw;background:#202020;border:1px solid #3d3d3d;
+    box-shadow:0 20px 64px rgba(0,0,0,.65);color:var(--text);
+    font-size:12.5px;display:flex;flex-direction:column;max-height:92vh}
+  .wl-pad-head{display:flex;align-items:center;justify-content:space-between;
+    padding:8px 10px;background:linear-gradient(135deg,#5a2ea6,#ff7ac8);
+    color:#fff;font-weight:600;font-size:12.5px}
+  .wl-pad-head .x{border:0;background:transparent;color:#fff;font-size:13px;
+    cursor:default;padding:0 4px}
+  .wl-pad-head .x:hover{background:rgba(255,255,255,.2)}
+  .wl-pad-body{display:flex;gap:14px;padding:14px;align-items:flex-start;overflow:auto}
+  .wl-pad-stage{flex:none;border:1px solid #444;line-height:0;
+    background-color:#454545;
+    background-image:linear-gradient(45deg,#3a3a3a 25%,transparent 25%),
+      linear-gradient(-45deg,#3a3a3a 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#3a3a3a 75%),
+      linear-gradient(-45deg,transparent 75%,#3a3a3a 75%);
+    background-size:20px 20px;
+    background-position:0 0,0 10px,10px -10px,-10px 0}
+  .wl-pad-canvas{width:320px;height:320px;display:block;cursor:crosshair;touch-action:none}
+  .wl-pad-tools{flex:1;min-width:150px;display:flex;flex-direction:column;gap:10px}
+  .wl-swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .wl-sw{height:26px;border:1px solid #555;border-radius:3px;cursor:default;padding:0}
+  .wl-sw:hover{border-color:#8a8a8a}
+  .wl-sw.on{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+  .wl-row{display:flex;align-items:center;gap:8px;color:#c9c9c9}
+  .wl-size{flex:1;min-width:0;accent-color:var(--accent-solid)}
+  .wl-sizeval{width:20px;text-align:right;color:#e6e6e6}
+  .wl-tbtn{flex:1;border:1px solid #3f3f3f;background:#2e2e2e;color:#e6e6e6;
+    font:inherit;font-size:12px;padding:5px 8px;border-radius:2px;cursor:default}
+  .wl-tbtn:hover{background:#3a3a3a;border-color:#585858}
+  .wl-tbtn.on{background:var(--accent-solid);border-color:var(--accent-solid);color:#fff}
+  .wl-pad-note{margin:2px 0 0;font-size:11.5px;line-height:1.5;color:#8e8e8e}
+  .wl-pad-foot{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;
+    border-top:1px solid #333;background:#1c1c1c}
